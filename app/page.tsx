@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, ReactNode, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useState } from "react";
 
 type Workflow = {
   id: string;
@@ -163,7 +163,7 @@ const workflows: Workflow[] = [
 
 const starterState: FormState = {
   market: "",
-  timeframe: "Automatically selected from market data and workflow",
+  timeframe: "Automatically selected from market data and the full 12-module analysis",
   capital: "Not specified",
   riskPerTrade: "Not specified",
   riskTolerance: "Not specified",
@@ -313,17 +313,11 @@ function MarkdownResult({ content }: { content: string }) {
 }
 
 export default function Home() {
-  const [selectedWorkflow, setSelectedWorkflow] = useState(workflows[0].id);
   const [form, setForm] = useState<FormState>(starterState);
   const [marketData, setMarketData] = useState<MarketData | null>(null);
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
-  const activeWorkflow = useMemo(
-    () => workflows.find((workflow) => workflow.id === selectedWorkflow) ?? workflows[0],
-    [selectedWorkflow],
-  );
 
   function updateField(field: keyof FormState, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -388,7 +382,7 @@ export default function Home() {
       const response = await fetch("/api/gemini", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workflow: selectedWorkflow, ...enrichedForm }),
+        body: JSON.stringify(enrichedForm),
       });
       const data = await response.json();
 
@@ -421,10 +415,10 @@ export default function Home() {
         <div className="hero-grid">
           <div className="hero-copy">
             <span className="eyebrow">Trading intelligence powered by Gemini</span>
-            <h1>Type a stock, choose a prompt, get an AI investment report.</h1>
+            <h1>Type a stock, get the full 12-prompt AI investment report.</h1>
             <p>
-              No advanced setup, no manual metrics. The app fetches market data, scores the stock from 0 to 100,
-              and sends the right context to Gemini automatically.
+              No prompt setup, no manual metrics. The app fetches market data, scores the stock from 0 to 100,
+              and asks Gemini to blend all 12 research prompts into one integrated report.
             </p>
             <div className="hero-actions">
               <a className="primary-cta" href="#workspace">Generate analysis</a>
@@ -485,17 +479,12 @@ export default function Home() {
         <div className="workflow-panel">
           <div className="section-heading">
             <span>Research modules</span>
-            <h2>Choose the prompt type</h2>
+            <h2>All 12 prompts included</h2>
           </div>
 
-          <div className="workflow-grid">
+          <div className="workflow-grid included-workflow-grid">
             {workflows.map((workflow) => (
-              <button
-                className={`workflow-card ${workflow.id === selectedWorkflow ? "selected" : ""}`}
-                key={workflow.id}
-                onClick={() => setSelectedWorkflow(workflow.id)}
-                type="button"
-              >
+              <article className="workflow-card included" key={workflow.id}>
                 <span className="workflow-number">{workflow.number}</span>
                 <strong>{workflow.title}</strong>
                 <span>{workflow.short}</span>
@@ -504,7 +493,7 @@ export default function Home() {
                     <em key={tag}>{tag}</em>
                   ))}
                 </div>
-              </button>
+              </article>
             ))}
           </div>
         </div>
@@ -512,10 +501,10 @@ export default function Home() {
         <div className="terminal-panel">
           <div className="terminal-header">
             <div>
-              <span>Active module</span>
-              <h2>{activeWorkflow.title}</h2>
+              <span>Analysis mode</span>
+              <h2>Full research suite</h2>
             </div>
-            <span className="status-pill">{activeWorkflow.number}/12</span>
+            <span className="status-pill">12/12 prompts</span>
           </div>
 
           <form onSubmit={submitAnalysis} className="analysis-form simplified-form">
@@ -529,14 +518,14 @@ export default function Home() {
                 />
               </label>
               <p>
-                Enter the stock only. The app retrieves market data automatically and uses the selected prompt type below.
+                Enter the stock only. The app retrieves market data automatically and runs all 12 prompt types together.
               </p>
             </div>
 
             <div className="selected-prompt-card">
-              <span>Selected prompt</span>
-              <strong>{activeWorkflow.title}</strong>
-              <p>{activeWorkflow.short}</p>
+              <span>Included prompt suite</span>
+              <strong>All 12 research prompts</strong>
+              <p>Gemini will blend strategy generation, backtesting, risk/reward, regime detection, multi-factor logic, optimization, portfolio construction, trade setup, Monte Carlo, drawdown, macro, and alpha/edge analysis.</p>
             </div>
 
             {marketData && (
@@ -570,7 +559,7 @@ export default function Home() {
         {!result && !error && (
           <div className="empty-output">
             <span>Ready</span>
-            <p>Enter a stock, choose a prompt type, and generate a complete report with an objective investment score.</p>
+            <p>Enter a stock and generate one complete report that blends all 12 research prompts with an objective investment score.</p>
           </div>
         )}
 
