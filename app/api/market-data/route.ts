@@ -251,6 +251,12 @@ function calculateTradeLevels(args: {
       target2: null,
       target1Probability: null,
       target2Probability: null,
+      target1ExpectedSessions: null,
+      target2ExpectedSessions: null,
+      target1MedianSessions: null,
+      target2MedianSessions: null,
+      target1ExpectedTimeframe: null,
+      target2ExpectedTimeframe: null,
       targetProbabilityHorizon: null,
       targetProbabilitySampleSize: null,
       targetProbabilityMethod: "Insufficient price data for objective probability estimate",
@@ -306,6 +312,38 @@ function calculateTradeLevels(args: {
   };
 }
 
+function median(values: number[]) {
+  if (values.length === 0) {
+    return null;
+  }
+
+  const sorted = [...values].sort((a, b) => a - b);
+  const midpoint = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[midpoint - 1] + sorted[midpoint]) / 2 : sorted[midpoint];
+}
+
+function sessionsToTimeframe(sessions: number | null) {
+  if (sessions === null || !Number.isFinite(sessions)) {
+    return null;
+  }
+
+  if (sessions < 10) {
+    return `${Math.round(sessions)} trading sessions`;
+  }
+
+  const weeks = sessions / 5;
+  if (weeks < 8) {
+    return `about ${round(weeks, 1)} trading weeks`;
+  }
+
+  const months = sessions / 21;
+  if (months < 18) {
+    return `about ${round(months, 1)} trading months`;
+  }
+
+  return `about ${round(sessions / 252, 1)} trading years`;
+}
+
 function estimateTargetProbability(args: {
   points: PricePoint[];
   targetReturnPercent: number | null;
@@ -322,12 +360,16 @@ function estimateTargetProbability(args: {
     return {
       probability: null,
       sampleSize: 0,
-      method: "Insufficient historical sample for objective target probability",
+      averageSessionsToTarget: null,
+      medianSessionsToTarget: null,
+      expectedTimeframe: null,
+      method: "Insufficient historical sample for objective target probability and timeframe",
     };
   }
 
   let successes = 0;
   let observations = 0;
+  const sessionsToTarget: number[] = [];
   const maxStart = args.points.length - args.horizonSessions - 1;
 
   for (let index = 0; index <= maxStart; index += 1) {
@@ -351,6 +393,7 @@ function estimateTargetProbability(args: {
 
       if (typeof high === "number" && high >= targetPrice) {
         successes += 1;
+        sessionsToTarget.push(forward - index);
         break;
       }
     }
@@ -360,17 +403,25 @@ function estimateTargetProbability(args: {
     return {
       probability: null,
       sampleSize: 0,
-      method: "Insufficient historical sample for objective target probability",
+      averageSessionsToTarget: null,
+      medianSessionsToTarget: null,
+      expectedTimeframe: null,
+      method: "Insufficient historical sample for objective target probability and timeframe",
     };
   }
 
   // Haircut the empirical hit rate to avoid optimistic target probabilities.
   const conservativeProbability = (successes / observations) * 100 * 0.9;
+  const averageSessions = sessionsToTarget.length > 0 ? mean(sessionsToTarget) : null;
+  const medianSessions = median(sessionsToTarget);
 
   return {
     probability: round(conservativeProbability, 2),
     sampleSize: observations,
-    method: "Conservative empirical hit rate: historical target-before-stop frequency with same-day stop priority and 10% haircut",
+    averageSessionsToTarget: round(averageSessions, 1),
+    medianSessionsToTarget: round(medianSessions, 1),
+    expectedTimeframe: sessionsToTimeframe(medianSessions ?? averageSessions),
+    method: "Conservative empirical hit rate and timeframe: historical target-before-stop frequency with same-day stop priority and 10% probability haircut; timeframe uses median successful hit time when available",
   };
 }
 
@@ -547,8 +598,10 @@ Objective buy/sell/risk levels:
 - Current-price downside to stop: ${percent(tradeLevels.currentPriceRiskPercent as number | null)}
 - Target 1 / first sell zone: ${money(tradeLevels.target1 as number | null, currency)} (${percent(tradeLevels.upsideToTarget1Percent as number | null)} upside; R/R ${round(tradeLevels.rewardRiskTarget1 as number | null, 2) ?? "n/a"})
 - Target 1 probability: ${percent(tradeLevels.target1Probability as number | null)} over ~63 trading sessions
+- Target 1 expected timeframe if reached: ${tradeLevels.target1ExpectedTimeframe ?? "n/a"} (median ${round(tradeLevels.target1MedianSessions as number | null, 1) ?? "n/a"} sessions; average ${round(tradeLevels.target1ExpectedSessions as number | null, 1) ?? "n/a"} sessions)
 - Target 2 / extended sell zone: ${money(tradeLevels.target2 as number | null, currency)} (${percent(tradeLevels.upsideToTarget2Percent as number | null)} upside; R/R ${round(tradeLevels.rewardRiskTarget2 as number | null, 2) ?? "n/a"})
 - Target 2 probability: ${percent(tradeLevels.target2Probability as number | null)} over ~126 trading sessions
+- Target 2 expected timeframe if reached: ${tradeLevels.target2ExpectedTimeframe ?? "n/a"} (median ${round(tradeLevels.target2MedianSessions as number | null, 1) ?? "n/a"} sessions; average ${round(tradeLevels.target2ExpectedSessions as number | null, 1) ?? "n/a"} sessions)
 - Probability method: ${tradeLevels.targetProbabilityMethod}
 - Method: ${tradeLevels.method}
 
@@ -658,7 +711,13 @@ async function getMarketData(query: string) {
     ...tradeLevelsBase,
     target1Probability: target1Probability.probability,
     target2Probability: target2Probability.probability,
-    targetProbabilityHorizon: "Target 1: 63 trading sessions; Target 2: 126 trading sessions",
+    target1ExpectedSessions: target1Probability.averageSessionsToTarget,
+    target2ExpectedSessions: target2Probability.averageSessionsToTarget,
+    target1MedianSessions: target1Probability.medianSessionsToTarget,
+    target2MedianSessions: target2Probability.medianSessionsToTarget,
+    target1ExpectedTimeframe: target1Probability.expectedTimeframe,
+    target2ExpectedTimeframe: target2Probability.expectedTimeframe,
+    targetProbabilityHorizon: "Target 1 probability window: 63 trading sessions; Target 2 probability window: 126 trading sessions",
     targetProbabilitySampleSize: Math.min(target1Probability.sampleSize, target2Probability.sampleSize),
     targetProbabilityMethod: `${target1Probability.method}; ${target2Probability.method}`,
   };

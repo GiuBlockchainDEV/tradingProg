@@ -80,6 +80,12 @@ type MarketData = {
     target2: number | null;
     target1Probability: number | null;
     target2Probability: number | null;
+    target1ExpectedSessions: number | null;
+    target2ExpectedSessions: number | null;
+    target1MedianSessions: number | null;
+    target2MedianSessions: number | null;
+    target1ExpectedTimeframe: string | null;
+    target2ExpectedTimeframe: string | null;
     targetProbabilityHorizon: string | null;
     targetProbabilitySampleSize: number | null;
     targetProbabilityMethod: string;
@@ -556,7 +562,11 @@ export default function Home() {
               ? `${formatPercent(marketData.tradeLevels.target1Probability)} / ${formatPercent(marketData.tradeLevels.target2Probability)}`
               : "-- / --"}
           </strong>
-          <small>Target 1 / Target 2 probability</small>
+          <small>
+            {marketData
+              ? `T1 ${marketData.tradeLevels.target1ExpectedTimeframe ?? "n/a"} | T2 ${marketData.tradeLevels.target2ExpectedTimeframe ?? "n/a"}`
+              : "Target 1 / Target 2 probability"}
+          </small>
         </article>
         <article className="insight-card risk-card">
           <span>Risk to stop</span>
