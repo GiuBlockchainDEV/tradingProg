@@ -555,7 +555,7 @@ export default function Home() {
                 </div>
               </label>
               <p>
-                Inserisci solo il nome della stock: l'app risolve il ticker, scarica quote e storico da Yahoo Finance e aggiunge link TradingView per verifica grafica.
+                Inserisci solo il nome della stock: l&apos;app risolve il ticker, scarica quote e storico da Yahoo Finance e aggiunge link TradingView per verifica grafica.
               </p>
               {marketData && (
                 <div className="metric-preview-grid">
