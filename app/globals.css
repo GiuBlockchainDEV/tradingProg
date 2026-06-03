@@ -480,6 +480,70 @@ h1 {
   font-weight: 800;
 }
 
+
+.simplified-form {
+  gap: 18px;
+}
+
+.simple-stock-card input {
+  min-height: 58px;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.selected-prompt-card,
+.simple-score-card {
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.selected-prompt-card {
+  display: grid;
+  gap: 8px;
+}
+
+.selected-prompt-card span,
+.simple-score-card span,
+.simple-score-card small {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.selected-prompt-card strong {
+  color: var(--text);
+  font-size: 1.35rem;
+}
+
+.selected-prompt-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.simple-score-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  border-color: rgba(0, 230, 118, 0.28);
+  background: linear-gradient(135deg, rgba(0, 230, 118, 0.13), rgba(255, 255, 255, 0.035));
+}
+
+.simple-score-card div {
+  display: grid;
+  gap: 6px;
+}
+
+.simple-score-card strong {
+  color: var(--green);
+  font-size: 1.55rem;
+  letter-spacing: -0.03em;
+}
+
 .terminal-panel {
   border: 1px solid var(--line);
   border-radius: 28px;
@@ -651,7 +715,8 @@ tr:last-child td {
 
 @media (max-width: 680px) {
   .stock-input-row,
-  .metric-preview-grid {
+  .metric-preview-grid,
+  .simple-score-card {
     grid-template-columns: 1fr;
   }
 

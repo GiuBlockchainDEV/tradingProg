@@ -162,13 +162,13 @@ const workflows: Workflow[] = [
 ];
 
 const starterState: FormState = {
-  market: "Apple",
-  timeframe: "1D",
-  capital: "10000 EUR",
-  riskPerTrade: "1%",
-  riskTolerance: "Medium",
-  timeHorizon: "1-3 anni",
-  assets: "AAPL",
+  market: "",
+  timeframe: "Automatically selected from market data and workflow",
+  capital: "Not specified",
+  riskPerTrade: "Not specified",
+  riskTolerance: "Not specified",
+  timeHorizon: "Not specified",
+  assets: "",
   strategyRules: "",
   historicalData: "",
   extraContext: "",
@@ -188,7 +188,7 @@ function formatPrice(value: number | null, currency?: string) {
     return "n/a";
   }
 
-  return `${currency ? `${currency} ` : ""}${value.toLocaleString("it-IT", { maximumFractionDigits: 2 })}`;
+  return `${currency ? `${currency} ` : ""}${value.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 }
 
 function formatCompact(value: number | null) {
@@ -196,7 +196,7 @@ function formatCompact(value: number | null) {
     return "n/a";
   }
 
-  return new Intl.NumberFormat("it-IT", {
+  return new Intl.NumberFormat("en-US", {
     notation: "compact",
     maximumFractionDigits: 2,
   }).format(value);
@@ -319,7 +319,6 @@ export default function Home() {
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingMarket, setIsLoadingMarket] = useState(false);
 
   const activeWorkflow = useMemo(
     () => workflows.find((workflow) => workflow.id === selectedWorkflow) ?? workflows[0],
@@ -336,7 +335,7 @@ export default function Home() {
   function mergeMarketDataIntoForm(data: MarketData, currentForm: FormState) {
     const extraContext = [
       currentForm.extraContext,
-      `Automatic sources: Yahoo Finance (${data.links.yahoo}) e TradingView (${data.links.tradingView}).`,
+      `Automatic sources: Yahoo Finance (${data.links.yahoo}) and TradingView (${data.links.tradingView}).`,
     ]
       .filter(Boolean)
       .join("\n\n");
@@ -363,29 +362,6 @@ export default function Home() {
     }
 
     return data as MarketData;
-  }
-
-  async function loadMarketData() {
-    const query = form.market.trim();
-    if (!query) {
-      setError("Enter a stock name or ticker.");
-      return null;
-    }
-
-    setIsLoadingMarket(true);
-    setError("");
-
-    try {
-      const data = await fetchMarketData(query);
-      setMarketData(data);
-      setForm((current) => mergeMarketDataIntoForm(data, current));
-      return data;
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Error while retrieving market data.");
-      return null;
-    } finally {
-      setIsLoadingMarket(false);
-    }
   }
 
   async function submitAnalysis(event: FormEvent<HTMLFormElement>) {
@@ -417,7 +393,7 @@ export default function Home() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error ?? "Richiesta non riuscita.");
+        throw new Error(data.error ?? "Request failed.");
       }
 
       setResult(data.result);
@@ -445,10 +421,10 @@ export default function Home() {
         <div className="hero-grid">
           <div className="hero-copy">
             <span className="eyebrow">Trading intelligence powered by Gemini</span>
-            <h1>A Next.js suite for strategies, backtests, risk, and portfolios.</h1>
+            <h1>Type a stock, choose a prompt, get an AI investment report.</h1>
             <p>
-              Turn trading research prompts into operating workflows: generate strategies, analyze drawdowns,
-              build portfolios, and create setups with a fast, responsive green fintech UI.
+              No advanced setup, no manual metrics. The app fetches market data, scores the stock from 0 to 100,
+              and sends the right context to Gemini automatically.
             </p>
             <div className="hero-actions">
               <a className="primary-cta" href="#workspace">Generate analysis</a>
@@ -456,7 +432,7 @@ export default function Home() {
             </div>
           </div>
 
-          <aside className="market-card" aria-label="Anteprima dashboard">
+          <aside className="market-card" aria-label="Dashboard preview">
             <div className="market-card-header">
               <span>Watchlist</span>
               <strong>Live style</strong>
@@ -497,11 +473,11 @@ export default function Home() {
         </div>
         <div>
           <strong>Markdown</strong>
-          <span>tabelle e checklist</span>
+          <span>tables and checklists</span>
         </div>
         <div>
           <strong>Responsive</strong>
-          <span>desktop e mobile</span>
+          <span>desktop and mobile</span>
         </div>
       </section>
 
@@ -509,7 +485,7 @@ export default function Home() {
         <div className="workflow-panel">
           <div className="section-heading">
             <span>Research modules</span>
-            <h2>Scegli cosa vuoi costruire</h2>
+            <h2>Choose the prompt type</h2>
           </div>
 
           <div className="workflow-grid">
@@ -542,135 +518,44 @@ export default function Home() {
             <span className="status-pill">{activeWorkflow.number}/12</span>
           </div>
 
-          <form onSubmit={submitAnalysis} className="analysis-form">
-            <div className="stock-search-card">
+          <form onSubmit={submitAnalysis} className="analysis-form simplified-form">
+            <div className="stock-search-card simple-stock-card">
               <label>
                 Stock name or ticker
-                <div className="stock-input-row">
-                  <input
-                    value={form.market}
-                    onChange={(event) => updateField("market", event.target.value)}
-                    placeholder="Example: Apple, Tesla, NVDA, Microsoft"
-                  />
-                  <button disabled={isLoadingMarket || isLoading} onClick={loadMarketData} type="button">
-                    {isLoadingMarket ? "Loading..." : "Load metrics"}
-                  </button>
-                </div>
+                <input
+                  value={form.market}
+                  onChange={(event) => updateField("market", event.target.value)}
+                  placeholder="Example: Apple, Tesla, NVDA, Microsoft"
+                />
               </label>
               <p>
-                Enter only the stock name: the app resolves the ticker, retrieves quotes and historical data from Yahoo Finance, and adds TradingView links for chart verification.
+                Enter the stock only. The app retrieves market data automatically and uses the selected prompt type below.
               </p>
-              {marketData && (
-                <div className="metric-preview-grid">
-                  <div className="metric-mini-card score-card">
-                    <span>Investment Score</span>
-                    <strong>{marketData.metrics.investmentScore}/100</strong>
-                    <small>{marketData.metrics.investmentScoreLabel}</small>
-                  </div>
-                  <div className="metric-mini-card">
-                    <span>Symbol</span>
-                    <strong>{marketData.symbol}</strong>
-                    <small>{marketData.exchange || marketData.source}</small>
-                  </div>
-                  <div className="metric-mini-card">
-                    <span>Price</span>
-                    <strong>{formatPrice(marketData.quote.regularMarketPrice, marketData.currency)}</strong>
-                    <small>{formatPercent(marketData.quote.regularMarketChangePercent)} today</small>
-                  </div>
-                  <div className="metric-mini-card">
-                    <span>Volatility</span>
-                    <strong>{formatPercent(marketData.metrics.annualizedVolatility)}</strong>
-                    <small>annualized</small>
-                  </div>
-                  <div className="metric-mini-card">
-                    <span>Max drawdown</span>
-                    <strong>{formatPercent(marketData.metrics.maxDrawdown)}</strong>
-                    <small>available history</small>
-                  </div>
-                  <div className="metric-mini-card">
-                    <span>RSI 14</span>
-                    <strong>{marketData.metrics.rsi14 ?? "n/a"}</strong>
-                    <small>{marketData.metrics.trend}</small>
-                  </div>
-                  <div className="metric-mini-card">
-                    <span>Market cap</span>
-                    <strong>{formatCompact(marketData.quote.marketCap)}</strong>
-                    <small>P/E {marketData.quote.trailingPE ?? "n/a"}</small>
-                  </div>
-                </div>
-              )}
-              {marketData && (
-                <div className="source-links">
-                  <a href={marketData.links.yahoo} target="_blank" rel="noreferrer">Yahoo Finance</a>
-                  <a href={marketData.links.tradingView} target="_blank" rel="noreferrer">TradingView</a>
-                </div>
-              )}
             </div>
 
-            <div className="form-grid">
-              <label>
-                Timeframe
-                <input value={form.timeframe} onChange={(event) => updateField("timeframe", event.target.value)} />
-              </label>
-              <label>
-                Capital
-                <input value={form.capital} onChange={(event) => updateField("capital", event.target.value)} />
-              </label>
-              <label>
-                Risk per trade
-                <input value={form.riskPerTrade} onChange={(event) => updateField("riskPerTrade", event.target.value)} />
-              </label>
-              <label>
-                Risk tolerance
-                <select value={form.riskTolerance} onChange={(event) => updateField("riskTolerance", event.target.value)}>
-                  <option>Low</option>
-                  <option>Medium</option>
-                  <option>High</option>
-                </select>
-              </label>
-              <label>
-                Horizon
-                <input value={form.timeHorizon} onChange={(event) => updateField("timeHorizon", event.target.value)} />
-              </label>
+            <div className="selected-prompt-card">
+              <span>Selected prompt</span>
+              <strong>{activeWorkflow.title}</strong>
+              <p>{activeWorkflow.short}</p>
             </div>
 
-            <label>
-              Asset list / Investable universe
-              <input value={form.assets} onChange={(event) => updateField("assets", event.target.value)} />
-            </label>
-
-            <label>
-              Strategy rules or main request
-              <textarea
-                value={form.strategyRules}
-                onChange={(event) => updateField("strategyRules", event.target.value)}
-                placeholder={activeWorkflow.placeholder}
-                rows={6}
-              />
-            </label>
-
-            <label>
-              Historical data, metrics, or market observations
-              <textarea
-                value={form.historicalData}
-                onChange={(event) => updateField("historicalData", event.target.value)}
-                placeholder="Paste OHLCV, trade log, equity curve, previous metrics, or technical levels."
-                rows={4}
-              />
-            </label>
-
-            <label>
-              Extra notes
-              <textarea
-                value={form.extraContext}
-                onChange={(event) => updateField("extraContext", event.target.value)}
-                placeholder="Constraints, broker, fees, excluded instruments, operating preferences."
-                rows={3}
-              />
-            </label>
+            {marketData && (
+              <div className="simple-score-card">
+                <div>
+                  <span>Investment Score</span>
+                  <strong>{marketData.metrics.investmentScore}/100</strong>
+                  <small>{marketData.metrics.investmentScoreLabel}</small>
+                </div>
+                <div>
+                  <span>Resolved asset</span>
+                  <strong>{marketData.symbol}</strong>
+                  <small>{formatPrice(marketData.quote.regularMarketPrice, marketData.currency)}</small>
+                </div>
+              </div>
+            )}
 
             <button className="submit-button" disabled={isLoading} type="submit">
-              {isLoading ? "Gemini is processing..." : "Generate report with market data + Gemini"}
+              {isLoading ? "Generating report..." : "Generate report"}
             </button>
           </form>
         </div>
@@ -685,7 +570,7 @@ export default function Home() {
         {!result && !error && (
           <div className="empty-output">
             <span>Ready</span>
-            <p>Enter the stock name, load automatic metrics, and generate a complete report with summary, tables, rules, risks, and an objective score.</p>
+            <p>Enter a stock, choose a prompt type, and generate a complete report with an objective investment score.</p>
           </div>
         )}
 
