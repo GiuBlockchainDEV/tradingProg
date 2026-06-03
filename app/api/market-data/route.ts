@@ -131,6 +131,104 @@ function rsi(closes: number[], window = 14) {
   return 100 - 100 / (1 + relativeStrength);
 }
 
+function averageTrueRange(points: PricePoint[], window = 14) {
+  if (points.length <= window) {
+    return null;
+  }
+
+  const trueRanges = points.slice(1).map((point, index) => {
+    const previousClose = points[index].close;
+    if (
+      typeof point.high !== "number" ||
+      typeof point.low !== "number" ||
+      typeof previousClose !== "number"
+    ) {
+      return null;
+    }
+
+    return Math.max(
+      point.high - point.low,
+      Math.abs(point.high - previousClose),
+      Math.abs(point.low - previousClose),
+    );
+  }).filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+
+  if (trueRanges.length < window) {
+    return null;
+  }
+
+  return mean(trueRanges.slice(-window));
+}
+
+function calculateTradeLevels(args: {
+  lastClose: number | null;
+  sma50: number | null;
+  atr14: number | null;
+  recentSupport: number | null;
+  recentResistance: number | null;
+}) {
+  if (args.lastClose === null || args.lastClose <= 0) {
+    return {
+      buyZoneLow: null,
+      buyZoneHigh: null,
+      preferredBuy: null,
+      stopLoss: null,
+      riskPercent: null,
+      currentPriceRiskPercent: null,
+      target1: null,
+      target2: null,
+      sellZoneLow: null,
+      sellZoneHigh: null,
+      upsideToTarget1Percent: null,
+      upsideToTarget2Percent: null,
+      rewardRiskTarget1: null,
+      rewardRiskTarget2: null,
+      atr14: null,
+      support20: null,
+      resistance20: null,
+      method: "Insufficient price data for objective levels",
+    };
+  }
+
+  const lastClose = args.lastClose;
+  const atr = args.atr14 ?? lastClose * 0.03;
+  const support = args.recentSupport ?? Math.max(0, lastClose - 2 * atr);
+  const resistance = args.recentResistance ?? lastClose + 2 * atr;
+  const trendAnchor = args.sma50 ?? lastClose;
+  const rawBuyLow = Math.max(0.01, Math.min(support + 0.25 * atr, trendAnchor - 0.5 * atr, lastClose - 1.5 * atr));
+  const rawBuyHigh = Math.max(rawBuyLow, Math.min(lastClose, trendAnchor + 0.5 * atr));
+  const preferredBuy = (rawBuyLow + rawBuyHigh) / 2;
+  const stopLoss = Math.max(0.01, Math.min(support - 0.75 * atr, rawBuyLow - atr));
+  const riskPerShare = Math.max(0.01, preferredBuy - stopLoss);
+  const target1 = Math.max(resistance, preferredBuy + 2 * riskPerShare);
+  const target2 = Math.max(target1 + atr, preferredBuy + 3 * riskPerShare);
+  const sellZoneLow = target1;
+  const sellZoneHigh = target2;
+  const riskPercent = (riskPerShare / preferredBuy) * 100;
+  const currentPriceRiskPercent = ((lastClose - stopLoss) / lastClose) * 100;
+
+  return {
+    buyZoneLow: round(rawBuyLow, 2),
+    buyZoneHigh: round(rawBuyHigh, 2),
+    preferredBuy: round(preferredBuy, 2),
+    stopLoss: round(stopLoss, 2),
+    riskPercent: round(riskPercent, 2),
+    currentPriceRiskPercent: round(currentPriceRiskPercent, 2),
+    target1: round(target1, 2),
+    target2: round(target2, 2),
+    sellZoneLow: round(sellZoneLow, 2),
+    sellZoneHigh: round(sellZoneHigh, 2),
+    upsideToTarget1Percent: round(((target1 / preferredBuy) - 1) * 100, 2),
+    upsideToTarget2Percent: round(((target2 / preferredBuy) - 1) * 100, 2),
+    rewardRiskTarget1: round((target1 - preferredBuy) / riskPerShare, 2),
+    rewardRiskTarget2: round((target2 - preferredBuy) / riskPerShare, 2),
+    atr14: round(args.atr14, 2),
+    support20: round(args.recentSupport, 2),
+    resistance20: round(args.recentResistance, 2),
+    method: "ATR- and support/resistance-based educational levels; verify with live chart before execution",
+  };
+}
+
 function annualizedReturn(closes: number[], firstDate?: Date, lastDate?: Date) {
   if (closes.length < 2 || !firstDate || !lastDate) {
     return null;
@@ -275,9 +373,10 @@ function buildPromptContext(args: {
   quoteType?: string;
   quote: Record<string, unknown>;
   metrics: Record<string, number | null | string>;
+  tradeLevels: Record<string, number | null | string>;
   links: { yahoo: string; tradingView: string };
 }) {
-  const { displayName, symbol, exchange, currency, quoteType, quote, metrics, links } = args;
+  const { displayName, symbol, exchange, currency, quoteType, quote, metrics, tradeLevels, links } = args;
 
   return `Market data automatically retrieved from Yahoo Finance for ${displayName} (${symbol}).
 Numerical source: Yahoo Finance quote and 5Y daily chart. Verification links: Yahoo ${links.yahoo}; TradingView ${links.tradingView}.
@@ -294,6 +393,16 @@ Objective investment score:
 - Score: ${metrics.investmentScore}/100
 - Label: ${metrics.investmentScoreLabel}
 - Main drivers: ${metrics.investmentScoreDrivers || "n/a"}
+
+Objective buy/sell/risk levels:
+- Suggested buy zone: ${money(tradeLevels.buyZoneLow as number | null, currency)} - ${money(tradeLevels.buyZoneHigh as number | null, currency)}
+- Preferred buy price: ${money(tradeLevels.preferredBuy as number | null, currency)}
+- Stop-loss: ${money(tradeLevels.stopLoss as number | null, currency)}
+- Risk from preferred buy to stop: ${percent(tradeLevels.riskPercent as number | null)}
+- Current-price downside to stop: ${percent(tradeLevels.currentPriceRiskPercent as number | null)}
+- Target 1 / first sell zone: ${money(tradeLevels.target1 as number | null, currency)} (${percent(tradeLevels.upsideToTarget1Percent as number | null)} upside; R/R ${round(tradeLevels.rewardRiskTarget1 as number | null, 2) ?? "n/a"})
+- Target 2 / extended sell zone: ${money(tradeLevels.target2 as number | null, currency)} (${percent(tradeLevels.upsideToTarget2Percent as number | null)} upside; R/R ${round(tradeLevels.rewardRiskTarget2 as number | null, 2) ?? "n/a"})
+- Method: ${tradeLevels.method}
 
 Price and performance:
 - Current price: ${money(numeric(quote.regularMarketPrice), currency)}
@@ -319,7 +428,7 @@ Key fundamentals:
 - Dividend yield: ${percent(dividendPercent(quote.dividendYield))}
 - Beta: ${round(numeric(quote.beta), 2) ?? "n/a"}
 
-Instructions: use these data points as the base for the report, do not invent missing metrics, keep the investment score visible, and recommend verification on TradingView/Yahoo before execution.`;}
+Instructions: use these data points as the base for the report, do not invent missing metrics, keep the investment score and buy/sell/risk levels visible, and recommend verification on TradingView/Yahoo before execution.`;}
 
 async function getMarketData(query: string) {
   const search = await yahooFinance.search(query, { quotesCount: 8, newsCount: 0 }) as unknown as { quotes?: Array<Record<string, string>> };
@@ -364,6 +473,17 @@ async function getMarketData(query: string) {
   const high52Week = closes252.length > 0 ? Math.max(...closes252) : null;
   const low52Week = closes252.length > 0 ? Math.min(...closes252) : null;
   const averageVolume30 = mean(pricePoints.slice(-30).map((point) => Number(point.volume)).filter(Number.isFinite));
+  const atr14 = averageTrueRange(pricePoints, 14);
+  const recent20 = pricePoints.slice(-20);
+  const recentSupport = recent20.length > 0 ? Math.min(...recent20.map((point) => Number(point.low ?? point.close)).filter(Number.isFinite)) : null;
+  const recentResistance = recent20.length > 0 ? Math.max(...recent20.map((point) => Number(point.high ?? point.close)).filter(Number.isFinite)) : null;
+  const tradeLevels = calculateTradeLevels({
+    lastClose,
+    sma50,
+    atr14,
+    recentSupport,
+    recentResistance,
+  });
   const baseMetrics = {
     lastClose: round(lastClose, 2),
     oneYearReturn: round(oneYearReturn, 2),
@@ -377,6 +497,9 @@ async function getMarketData(query: string) {
     low52Week: round(low52Week, 2),
     distanceFrom52WeekHigh: high52Week && lastClose ? round((lastClose / high52Week - 1) * 100, 2) : null,
     averageVolume30: round(averageVolume30, 0),
+    atr14: round(atr14, 2),
+    support20: round(recentSupport, 2),
+    resistance20: round(recentResistance, 2),
     trend: trendLabel(lastClose, sma50, sma200),
   };
   const investmentScore = calculateInvestmentScore({
@@ -430,6 +553,7 @@ async function getMarketData(query: string) {
       averageDailyVolume3Month: numeric(quote.averageDailyVolume3Month),
     },
     metrics,
+    tradeLevels,
     history: pricePoints.slice(-260).map((point) => ({
       date: point.date.toISOString().slice(0, 10),
       close: round(point.close, 2),
@@ -443,6 +567,7 @@ async function getMarketData(query: string) {
       quoteType: textValue(quote.quoteType) || textValue(match.quoteType),
       quote: quote as unknown as Record<string, unknown>,
       metrics,
+      tradeLevels: tradeLevels as unknown as Record<string, number | null | string>,
       links,
     }),
   };

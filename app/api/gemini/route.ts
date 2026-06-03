@@ -104,13 +104,14 @@ Mandatory response format:
 1. Objective Investment Score: provide a single score from 0 to 100 in the first line, formatted exactly as "Investment Score: X/100". Make the score data-driven: trend, risk, volatility, drawdown, valuation, momentum, liquidity, macro context, portfolio fit, and quality of evidence must influence it. If the automatic market-data context already contains an investment score, use it as the anchor and adjust only if the broader 12-module analysis justifies it.
 2. One integrated executive summary in 5-8 bullet points.
 3. Unified decision table with: score drivers, trend/regime, risk/reward, valuation, drawdown risk, macro sensitivity, trade quality, portfolio role, and confidence level.
-4. Blended strategy plan: entry logic, exit logic, stop/risk rules, position sizing, and invalidation conditions.
-5. Backtest and robustness view: CAGR/Sharpe assumptions, max drawdown, win-rate expectations, Monte Carlo risks, and what data is still needed.
-6. Risk-reduction and return-improvement ideas: include concrete improvements without increasing risk where possible.
-7. Portfolio fit: whether this asset should be a core holding, satellite position, tactical trade, watchlist-only candidate, or avoid.
-8. Market conditions that help or break the thesis.
-9. Final action framework: bullish case, base case, bearish case, and what to monitor next.
-10. Short disclaimer: educational research only, not financial advice.
+4. Mandatory Buy / Sell / Risk table: include suggested buy zone, preferred buy price, stop-loss, risk percentage from buy to stop, current-price downside to stop, target 1, target 2, sell/trim zone, upside percentages, and reward/risk. If the current price is not attractive, explicitly say to wait for the buy zone instead of buying immediately.
+5. Blended strategy plan: entry logic, exit logic, stop/risk rules, position sizing, and invalidation conditions.
+6. Backtest and robustness view: CAGR/Sharpe assumptions, max drawdown, win-rate expectations, Monte Carlo risks, and what data is still needed.
+7. Risk-reduction and return-improvement ideas: include concrete improvements without increasing risk where possible.
+8. Portfolio fit: whether this asset should be a core holding, satellite position, tactical trade, watchlist-only candidate, or avoid.
+9. Market conditions that help or break the thesis.
+10. Final action framework: bullish case, base case, bearish case, and what to monitor next.
+11. Short disclaimer: educational research only, not financial advice.
 
 Use clean Markdown with tables where useful. Keep numbers, formulas, and thresholds explicit when reasonable, but flag assumptions and stale or missing data.`;
 }

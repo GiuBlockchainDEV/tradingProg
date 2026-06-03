@@ -58,6 +58,23 @@ type MarketData = {
     investmentScoreLabel: string;
     investmentScoreDrivers: string;
   };
+  tradeLevels: {
+    buyZoneLow: number | null;
+    buyZoneHigh: number | null;
+    preferredBuy: number | null;
+    stopLoss: number | null;
+    riskPercent: number | null;
+    currentPriceRiskPercent: number | null;
+    target1: number | null;
+    target2: number | null;
+    sellZoneLow: number | null;
+    sellZoneHigh: number | null;
+    upsideToTarget1Percent: number | null;
+    upsideToTarget2Percent: number | null;
+    rewardRiskTarget1: number | null;
+    rewardRiskTarget2: number | null;
+    method: string;
+  };
   promptContext: string;
 };
 
@@ -539,6 +556,21 @@ export default function Home() {
                   <span>Resolved asset</span>
                   <strong>{marketData.symbol}</strong>
                   <small>{formatPrice(marketData.quote.regularMarketPrice, marketData.currency)}</small>
+                </div>
+                <div>
+                  <span>Buy zone</span>
+                  <strong>{formatPrice(marketData.tradeLevels.buyZoneLow, marketData.currency)} - {formatPrice(marketData.tradeLevels.buyZoneHigh, marketData.currency)}</strong>
+                  <small>Preferred: {formatPrice(marketData.tradeLevels.preferredBuy, marketData.currency)}</small>
+                </div>
+                <div>
+                  <span>Sell targets</span>
+                  <strong>{formatPrice(marketData.tradeLevels.target1, marketData.currency)} / {formatPrice(marketData.tradeLevels.target2, marketData.currency)}</strong>
+                  <small>Trim/sell zone</small>
+                </div>
+                <div>
+                  <span>Risk</span>
+                  <strong>{formatPercent(marketData.tradeLevels.riskPercent)}</strong>
+                  <small>Stop: {formatPrice(marketData.tradeLevels.stopLoss, marketData.currency)}</small>
                 </div>
               </div>
             )}

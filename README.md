@@ -45,4 +45,8 @@ GEMINI_MODEL=gemini-2.5-flash
 
 ## Automatic market data
 
-The `/api/market-data` route accepts a stock name or ticker, resolves the symbol through Yahoo Finance, and calculates technical/fundamental metrics over up to 5 years of history: price, 1Y performance, CAGR, annualized volatility, max drawdown, SMA 50/200, RSI 14, average volume, market cap, P/E, dividend yield, beta when available, and an objective 0-100 investment score. TradingView is included as a chart-verification link, not as unofficial scraping/API access.
+The `/api/market-data` route accepts a stock name or ticker, resolves the symbol through Yahoo Finance, and calculates technical/fundamental metrics over up to 5 years of history: price, 1Y performance, CAGR, annualized volatility, max drawdown, SMA 50/200, RSI 14, average volume, market cap, P/E, dividend yield, beta when available, an objective 0-100 investment score, suggested buy zone, preferred buy price, stop-loss, risk percentage, sell targets, and reward/risk levels. TradingView is included as a chart-verification link, not as unofficial scraping/API access.
+
+## Buy / Sell / Risk levels
+
+The backend calculates educational trade levels from market data using recent support/resistance and ATR-style volatility: suggested buy zone, preferred buy price, stop-loss, percentage risk to stop, target 1, target 2, sell/trim zone, upside percentages, and reward/risk. Gemini is instructed to include these levels in every report and to say when waiting for a pullback is better than buying immediately.
