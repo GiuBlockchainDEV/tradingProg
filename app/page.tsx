@@ -24,6 +24,41 @@ type FormState = {
   extraContext: string;
 };
 
+type MarketData = {
+  symbol: string;
+  displayName: string;
+  exchange?: string;
+  currency?: string;
+  source: string;
+  links: {
+    yahoo: string;
+    tradingView: string;
+  };
+  quote: {
+    regularMarketPrice: number | null;
+    regularMarketChangePercent: number | null;
+    marketCap: number | null;
+    trailingPE: number | null;
+    forwardPE: number | null;
+    beta: number | null;
+    dividendYield: number | null;
+  };
+  metrics: {
+    oneYearReturn: number | null;
+    annualizedReturn: number | null;
+    annualizedVolatility: number | null;
+    maxDrawdown: number | null;
+    sma50: number | null;
+    sma200: number | null;
+    rsi14: number | null;
+    distanceFrom52WeekHigh: number | null;
+    averageVolume30: number | null;
+    trend: string;
+  };
+  promptContext: string;
+};
+
+
 const workflows: Workflow[] = [
   {
     id: "strategy_generation",
@@ -124,17 +159,45 @@ const workflows: Workflow[] = [
 ];
 
 const starterState: FormState = {
-  market: "Crypto / Stocks / Forex",
+  market: "Apple",
   timeframe: "1D",
   capital: "10000 EUR",
   riskPerTrade: "1%",
   riskTolerance: "Media",
   timeHorizon: "1-3 anni",
-  assets: "BTC, ETH, SPY, QQQ, GLD",
+  assets: "AAPL",
   strategyRules: "",
   historicalData: "",
   extraContext: "",
 };
+
+
+function formatPercent(value: number | null) {
+  if (value === null || !Number.isFinite(value)) {
+    return "n/d";
+  }
+
+  return `${value.toFixed(2)}%`;
+}
+
+function formatPrice(value: number | null, currency?: string) {
+  if (value === null || !Number.isFinite(value)) {
+    return "n/d";
+  }
+
+  return `${currency ? `${currency} ` : ""}${value.toLocaleString("it-IT", { maximumFractionDigits: 2 })}`;
+}
+
+function formatCompact(value: number | null) {
+  if (value === null || !Number.isFinite(value)) {
+    return "n/d";
+  }
+
+  return new Intl.NumberFormat("it-IT", {
+    notation: "compact",
+    maximumFractionDigits: 2,
+  }).format(value);
+}
 
 function parseInline(text: string) {
   const strongPattern = /\*\*(.*?)\*\*/g;
@@ -249,9 +312,11 @@ function MarkdownResult({ content }: { content: string }) {
 export default function Home() {
   const [selectedWorkflow, setSelectedWorkflow] = useState(workflows[0].id);
   const [form, setForm] = useState<FormState>(starterState);
+  const [marketData, setMarketData] = useState<MarketData | null>(null);
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMarket, setIsLoadingMarket] = useState(false);
 
   const activeWorkflow = useMemo(
     () => workflows.find((workflow) => workflow.id === selectedWorkflow) ?? workflows[0],
@@ -260,6 +325,64 @@ export default function Home() {
 
   function updateField(field: keyof FormState, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
+    if (field === "market") {
+      setMarketData(null);
+    }
+  }
+
+  function mergeMarketDataIntoForm(data: MarketData, currentForm: FormState) {
+    const extraContext = [
+      currentForm.extraContext,
+      `Fonti automatiche: Yahoo Finance (${data.links.yahoo}) e TradingView (${data.links.tradingView}).`,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    return {
+      ...currentForm,
+      market: `${data.displayName} (${data.symbol})`,
+      assets: data.symbol,
+      historicalData: data.promptContext,
+      extraContext,
+    };
+  }
+
+  async function fetchMarketData(query: string) {
+    const response = await fetch("/api/market-data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query }),
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error ?? "Impossibile recuperare i dati mercato.");
+    }
+
+    return data as MarketData;
+  }
+
+  async function loadMarketData() {
+    const query = form.market.trim();
+    if (!query) {
+      setError("Inserisci il nome della stock o il ticker.");
+      return null;
+    }
+
+    setIsLoadingMarket(true);
+    setError("");
+
+    try {
+      const data = await fetchMarketData(query);
+      setMarketData(data);
+      setForm((current) => mergeMarketDataIntoForm(data, current));
+      return data;
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Errore nel recupero dati mercato.");
+      return null;
+    } finally {
+      setIsLoadingMarket(false);
+    }
   }
 
   async function submitAnalysis(event: FormEvent<HTMLFormElement>) {
@@ -269,10 +392,24 @@ export default function Home() {
     setResult("");
 
     try {
+      let enrichedForm = form;
+      let dataForPrompt = marketData;
+
+      if (form.market.trim()) {
+        const needsFreshData = !marketData || !form.historicalData.includes("Dati mercato recuperati automaticamente");
+        dataForPrompt = needsFreshData ? await fetchMarketData(form.market) : marketData;
+
+        if (dataForPrompt) {
+          enrichedForm = mergeMarketDataIntoForm(dataForPrompt, form);
+          setMarketData(dataForPrompt);
+          setForm(enrichedForm);
+        }
+      }
+
       const response = await fetch("/api/gemini", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workflow: selectedWorkflow, ...form }),
+        body: JSON.stringify({ workflow: selectedWorkflow, ...enrichedForm }),
       });
       const data = await response.json();
 
@@ -403,11 +540,66 @@ export default function Home() {
           </div>
 
           <form onSubmit={submitAnalysis} className="analysis-form">
-            <div className="form-grid">
+            <div className="stock-search-card">
               <label>
-                Mercato / Asset
-                <input value={form.market} onChange={(event) => updateField("market", event.target.value)} />
+                Nome stock o ticker
+                <div className="stock-input-row">
+                  <input
+                    value={form.market}
+                    onChange={(event) => updateField("market", event.target.value)}
+                    placeholder="Esempio: Apple, Tesla, NVDA, Microsoft"
+                  />
+                  <button disabled={isLoadingMarket || isLoading} onClick={loadMarketData} type="button">
+                    {isLoadingMarket ? "Carico..." : "Carica metriche"}
+                  </button>
+                </div>
               </label>
+              <p>
+                Inserisci solo il nome della stock: l'app risolve il ticker, scarica quote e storico da Yahoo Finance e aggiunge link TradingView per verifica grafica.
+              </p>
+              {marketData && (
+                <div className="metric-preview-grid">
+                  <div className="metric-mini-card">
+                    <span>Simbolo</span>
+                    <strong>{marketData.symbol}</strong>
+                    <small>{marketData.exchange || marketData.source}</small>
+                  </div>
+                  <div className="metric-mini-card">
+                    <span>Prezzo</span>
+                    <strong>{formatPrice(marketData.quote.regularMarketPrice, marketData.currency)}</strong>
+                    <small>{formatPercent(marketData.quote.regularMarketChangePercent)} oggi</small>
+                  </div>
+                  <div className="metric-mini-card">
+                    <span>Volatilita</span>
+                    <strong>{formatPercent(marketData.metrics.annualizedVolatility)}</strong>
+                    <small>annualizzata</small>
+                  </div>
+                  <div className="metric-mini-card">
+                    <span>Max drawdown</span>
+                    <strong>{formatPercent(marketData.metrics.maxDrawdown)}</strong>
+                    <small>storico disponibile</small>
+                  </div>
+                  <div className="metric-mini-card">
+                    <span>RSI 14</span>
+                    <strong>{marketData.metrics.rsi14 ?? "n/d"}</strong>
+                    <small>{marketData.metrics.trend}</small>
+                  </div>
+                  <div className="metric-mini-card">
+                    <span>Market cap</span>
+                    <strong>{formatCompact(marketData.quote.marketCap)}</strong>
+                    <small>P/E {marketData.quote.trailingPE ?? "n/d"}</small>
+                  </div>
+                </div>
+              )}
+              {marketData && (
+                <div className="source-links">
+                  <a href={marketData.links.yahoo} target="_blank" rel="noreferrer">Yahoo Finance</a>
+                  <a href={marketData.links.tradingView} target="_blank" rel="noreferrer">TradingView</a>
+                </div>
+              )}
+            </div>
+
+            <div className="form-grid">
               <label>
                 Timeframe
                 <input value={form.timeframe} onChange={(event) => updateField("timeframe", event.target.value)} />
@@ -470,7 +662,7 @@ export default function Home() {
             </label>
 
             <button className="submit-button" disabled={isLoading} type="submit">
-              {isLoading ? "Gemini sta elaborando..." : "Genera report con Gemini"}
+              {isLoading ? "Gemini sta elaborando..." : "Genera report con dati mercato + Gemini"}
             </button>
           </form>
         </div>
@@ -485,7 +677,7 @@ export default function Home() {
         {!result && !error && (
           <div className="empty-output">
             <span>Pronto</span>
-            <p>Compila i campi, seleziona un modulo e genera un report completo con summary, tabelle, regole e rischi.</p>
+            <p>Inserisci il nome della stock, carica le metriche automatiche e genera un report completo con summary, tabelle, regole e rischi.</p>
           </div>
         )}
 

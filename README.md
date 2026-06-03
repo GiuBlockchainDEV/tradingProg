@@ -1,6 +1,6 @@
 # Gemini Trading Suite
 
-Applicazione Next.js per trasformare prompt di ricerca trading in report operativi generati da Google Gemini. Include 12 workflow: generazione strategie, backtesting, risk/reward, market regime, multi-factor, ottimizzazione, portfolio, trade setup, Monte Carlo, drawdown, macro strategy e alpha/edge detection.
+Applicazione Next.js per trasformare prompt di ricerca trading in report operativi generati da Google Gemini. L'utente puo inserire solo nome o ticker della stock: il backend recupera automaticamente metriche da Yahoo Finance e aggiunge link TradingView/Yahoo per verifica. Include 12 workflow: generazione strategie, backtesting, risk/reward, market regime, multi-factor, ottimizzazione, portfolio, trade setup, Monte Carlo, drawdown, macro strategy e alpha/edge detection.
 
 ## Setup
 
@@ -35,3 +35,7 @@ GEMINI_MODEL=gemini-3.5-flash
 - La chiave Gemini resta server-side e non viene esposta nel frontend.
 - I report sono ricerca educativa e non consulenza finanziaria personalizzata.
 - Per backtest numerici accurati servono dati storici reali: l'app accetta dati incollati dall'utente e chiede a Gemini di esplicitare assunzioni e test mancanti.
+
+## Dati mercato automatici
+
+La route `/api/market-data` accetta un nome o ticker, risolve il simbolo via Yahoo Finance e calcola metriche tecniche/fondamentali su storico fino a 5 anni: prezzo, performance 1Y, CAGR, volatilita annualizzata, max drawdown, SMA 50/200, RSI 14, volume medio, market cap, P/E, dividend yield e beta quando disponibili. TradingView e incluso come link di verifica grafica, non come scraping/API non ufficiale.
