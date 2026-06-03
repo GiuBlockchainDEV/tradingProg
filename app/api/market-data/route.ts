@@ -27,7 +27,7 @@ function textValue(value: unknown) {
 
 function dividendPercent(value: unknown) {
   const dividend = numeric(value);
-  return dividend === null ? null : dividend * 100;
+  return dividend;
 }
 
 function round(value: number | null | undefined, digits = 2) {
