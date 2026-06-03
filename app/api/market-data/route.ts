@@ -161,7 +161,7 @@ function buildPromptContext(args: {
 }
 
 async function getMarketData(query: string) {
-  const search = await yahooFinance.search(query, { quotesCount: 8, newsCount: 0 });
+  const search = await yahooFinance.search(query, { quotesCount: 8, newsCount: 0 }) as unknown as { quotes?: Array<Record<string, string>> };
   const quotes = search.quotes ?? [];
   const match = quotes.find((quote) => PREFERRED_TYPES.has(String(quote.quoteType))) ?? quotes[0];
 
@@ -173,10 +173,13 @@ async function getMarketData(query: string) {
   const period1 = new Date();
   period1.setFullYear(period1.getFullYear() - 5);
 
-  const [quote, chart] = await Promise.all([
+  const [quoteResult, chartResult] = await Promise.all([
     yahooFinance.quote(symbol),
     yahooFinance.chart(symbol, { period1, interval: "1d" }),
   ]);
+
+  const quote = quoteResult as unknown as Record<string, string | number | null | undefined>;
+  const chart = chartResult as unknown as { quotes?: PricePoint[] };
 
   const pricePoints: PricePoint[] = (chart.quotes ?? [])
     .filter((point) => typeof point.close === "number")
