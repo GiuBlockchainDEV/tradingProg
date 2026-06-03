@@ -13,6 +13,18 @@ npm run dev
 
 Apri `http://localhost:3000`.
 
+
+## Deploy su Vercel
+
+Il progetto e una app Next.js: su Vercel usa il framework preset `Next.js` e lascia l'output directory gestita come `.next`. Se nel pannello Vercel e impostato `public` come Output Directory, rimuovi quell'impostazione o usa il `vercel.json` incluso nel repo.
+
+Configura le variabili d'ambiente:
+
+```env
+GEMINI_API_KEY=la_tua_chiave
+GEMINI_MODEL=gemini-3.5-flash
+```
+
 ## Variabili d'ambiente
 
 - `GEMINI_API_KEY`: chiave API Google Gemini, richiesta dalla route server `/api/gemini`.
