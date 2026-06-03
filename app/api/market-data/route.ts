@@ -23,6 +23,11 @@ function textValue(value: unknown) {
   return typeof value === "string" && value.trim().length > 0 ? value : undefined;
 }
 
+function dividendPercent(value: unknown) {
+  const dividend = numeric(value);
+  return dividend === null ? null : dividend * 100;
+}
+
 function round(value: number | null | undefined, digits = 2) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return null;
@@ -165,7 +170,7 @@ function buildPromptContext(args: {
 }) {
   const { displayName, symbol, exchange, currency, quoteType, quote, metrics, links } = args;
 
-  return `Dati mercato recuperati automaticamente da Yahoo Finance per ${displayName} (${symbol}).\nFonte numerica: Yahoo Finance quote, quoteSummary e chart 5Y. Link di verifica: Yahoo ${links.yahoo}; TradingView ${links.tradingView}.\nTimestamp: ${new Date().toISOString()}\n\nIdentificazione:\n- Nome: ${displayName}\n- Simbolo: ${symbol}\n- Exchange: ${exchange || "n/d"}\n- Tipo: ${quoteType || "n/d"}\n- Valuta: ${currency || "n/d"}\n\nPrezzo e performance:\n- Prezzo corrente: ${money(numeric(quote.regularMarketPrice), currency)}\n- Variazione giornaliera: ${percent(numeric(quote.regularMarketChangePercent))}\n- Rendimento 1Y: ${percent(metrics.oneYearReturn as number | null)}\n- CAGR 5Y/storico disponibile: ${percent(metrics.annualizedReturn as number | null)}\n- Distanza da massimo 52 settimane: ${percent(metrics.distanceFrom52WeekHigh as number | null)}\n\nMetriche tecniche calcolate:\n- SMA 50: ${money(metrics.sma50 as number | null, currency)}\n- SMA 200: ${money(metrics.sma200 as number | null, currency)}\n- RSI 14: ${round(metrics.rsi14 as number | null, 1) ?? "n/d"}\n- Volatilita annualizzata: ${percent(metrics.annualizedVolatility as number | null)}\n- Max drawdown storico disponibile: ${percent(metrics.maxDrawdown as number | null)}\n- Volume medio 30 sedute: ${compactNumber(metrics.averageVolume30 as number | null)}\n- Regime trend: ${metrics.trend}\n\nFondamentali principali:\n- Market cap: ${compactNumber(numeric(quote.marketCap))}\n- P/E trailing: ${round(numeric(quote.trailingPE), 2) ?? "n/d"}\n- P/E forward: ${round(numeric(quote.forwardPE), 2) ?? "n/d"}\n- EPS trailing: ${round(numeric(quote.epsTrailingTwelveMonths), 2) ?? "n/d"}\n- Dividend yield: ${percent(typeof quote.dividendYield === "number" ? numeric(quote.dividendYield) * 100 : null)}\n- Beta: ${round(numeric(quote.beta), 2) ?? "n/d"}\n\nIstruzioni: usa questi dati come base del report, non inventare metriche mancanti, e suggerisci sempre verifica su TradingView/Yahoo prima dell'esecuzione.`;
+  return `Dati mercato recuperati automaticamente da Yahoo Finance per ${displayName} (${symbol}).\nFonte numerica: Yahoo Finance quote, quoteSummary e chart 5Y. Link di verifica: Yahoo ${links.yahoo}; TradingView ${links.tradingView}.\nTimestamp: ${new Date().toISOString()}\n\nIdentificazione:\n- Nome: ${displayName}\n- Simbolo: ${symbol}\n- Exchange: ${exchange || "n/d"}\n- Tipo: ${quoteType || "n/d"}\n- Valuta: ${currency || "n/d"}\n\nPrezzo e performance:\n- Prezzo corrente: ${money(numeric(quote.regularMarketPrice), currency)}\n- Variazione giornaliera: ${percent(numeric(quote.regularMarketChangePercent))}\n- Rendimento 1Y: ${percent(metrics.oneYearReturn as number | null)}\n- CAGR 5Y/storico disponibile: ${percent(metrics.annualizedReturn as number | null)}\n- Distanza da massimo 52 settimane: ${percent(metrics.distanceFrom52WeekHigh as number | null)}\n\nMetriche tecniche calcolate:\n- SMA 50: ${money(metrics.sma50 as number | null, currency)}\n- SMA 200: ${money(metrics.sma200 as number | null, currency)}\n- RSI 14: ${round(metrics.rsi14 as number | null, 1) ?? "n/d"}\n- Volatilita annualizzata: ${percent(metrics.annualizedVolatility as number | null)}\n- Max drawdown storico disponibile: ${percent(metrics.maxDrawdown as number | null)}\n- Volume medio 30 sedute: ${compactNumber(metrics.averageVolume30 as number | null)}\n- Regime trend: ${metrics.trend}\n\nFondamentali principali:\n- Market cap: ${compactNumber(numeric(quote.marketCap))}\n- P/E trailing: ${round(numeric(quote.trailingPE), 2) ?? "n/d"}\n- P/E forward: ${round(numeric(quote.forwardPE), 2) ?? "n/d"}\n- EPS trailing: ${round(numeric(quote.epsTrailingTwelveMonths), 2) ?? "n/d"}\n- Dividend yield: ${percent(dividendPercent(quote.dividendYield))}\n- Beta: ${round(numeric(quote.beta), 2) ?? "n/d"}\n\nIstruzioni: usa questi dati come base del report, non inventare metriche mancanti, e suggerisci sempre verifica su TradingView/Yahoo prima dell'esecuzione.`;
 }
 
 async function getMarketData(query: string) {
@@ -250,7 +255,7 @@ async function getMarketData(query: string) {
       trailingPE: round(numeric(quote.trailingPE), 2),
       forwardPE: round(numeric(quote.forwardPE), 2),
       epsTrailingTwelveMonths: round(numeric(quote.epsTrailingTwelveMonths), 2),
-      dividendYield: round(numeric(quote.dividendYield) === null ? null : Number(numeric(quote.dividendYield)) * 100, 2),
+      dividendYield: round(dividendPercent(quote.dividendYield), 2),
       beta: round(numeric(quote.beta), 2),
       fiftyTwoWeekHigh: round(numeric(quote.fiftyTwoWeekHigh), 2),
       fiftyTwoWeekLow: round(numeric(quote.fiftyTwoWeekLow), 2),
