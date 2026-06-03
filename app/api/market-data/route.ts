@@ -15,6 +15,14 @@ type PricePoint = {
 
 const PREFERRED_TYPES = new Set(["EQUITY", "ETF", "MUTUALFUND", "INDEX"]);
 
+function numeric(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function textValue(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
 function round(value: number | null | undefined, digits = 2) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return null;
@@ -157,7 +165,7 @@ function buildPromptContext(args: {
 }) {
   const { displayName, symbol, exchange, currency, quoteType, quote, metrics, links } = args;
 
-  return `Dati mercato recuperati automaticamente da Yahoo Finance per ${displayName} (${symbol}).\nFonte numerica: Yahoo Finance quote, quoteSummary e chart 5Y. Link di verifica: Yahoo ${links.yahoo}; TradingView ${links.tradingView}.\nTimestamp: ${new Date().toISOString()}\n\nIdentificazione:\n- Nome: ${displayName}\n- Simbolo: ${symbol}\n- Exchange: ${exchange || "n/d"}\n- Tipo: ${quoteType || "n/d"}\n- Valuta: ${currency || "n/d"}\n\nPrezzo e performance:\n- Prezzo corrente: ${money(quote.regularMarketPrice as number | undefined, currency)}\n- Variazione giornaliera: ${percent(quote.regularMarketChangePercent as number | undefined)}\n- Rendimento 1Y: ${percent(metrics.oneYearReturn as number | null)}\n- CAGR 5Y/storico disponibile: ${percent(metrics.annualizedReturn as number | null)}\n- Distanza da massimo 52 settimane: ${percent(metrics.distanceFrom52WeekHigh as number | null)}\n\nMetriche tecniche calcolate:\n- SMA 50: ${money(metrics.sma50 as number | null, currency)}\n- SMA 200: ${money(metrics.sma200 as number | null, currency)}\n- RSI 14: ${round(metrics.rsi14 as number | null, 1) ?? "n/d"}\n- Volatilita annualizzata: ${percent(metrics.annualizedVolatility as number | null)}\n- Max drawdown storico disponibile: ${percent(metrics.maxDrawdown as number | null)}\n- Volume medio 30 sedute: ${compactNumber(metrics.averageVolume30 as number | null)}\n- Regime trend: ${metrics.trend}\n\nFondamentali principali:\n- Market cap: ${compactNumber(quote.marketCap as number | undefined)}\n- P/E trailing: ${round(quote.trailingPE as number | undefined, 2) ?? "n/d"}\n- P/E forward: ${round(quote.forwardPE as number | undefined, 2) ?? "n/d"}\n- EPS trailing: ${round(quote.epsTrailingTwelveMonths as number | undefined, 2) ?? "n/d"}\n- Dividend yield: ${percent(typeof quote.dividendYield === "number" ? (quote.dividendYield as number) * 100 : null)}\n- Beta: ${round(quote.beta as number | undefined, 2) ?? "n/d"}\n\nIstruzioni: usa questi dati come base del report, non inventare metriche mancanti, e suggerisci sempre verifica su TradingView/Yahoo prima dell'esecuzione.`;
+  return `Dati mercato recuperati automaticamente da Yahoo Finance per ${displayName} (${symbol}).\nFonte numerica: Yahoo Finance quote, quoteSummary e chart 5Y. Link di verifica: Yahoo ${links.yahoo}; TradingView ${links.tradingView}.\nTimestamp: ${new Date().toISOString()}\n\nIdentificazione:\n- Nome: ${displayName}\n- Simbolo: ${symbol}\n- Exchange: ${exchange || "n/d"}\n- Tipo: ${quoteType || "n/d"}\n- Valuta: ${currency || "n/d"}\n\nPrezzo e performance:\n- Prezzo corrente: ${money(numeric(quote.regularMarketPrice), currency)}\n- Variazione giornaliera: ${percent(numeric(quote.regularMarketChangePercent))}\n- Rendimento 1Y: ${percent(metrics.oneYearReturn as number | null)}\n- CAGR 5Y/storico disponibile: ${percent(metrics.annualizedReturn as number | null)}\n- Distanza da massimo 52 settimane: ${percent(metrics.distanceFrom52WeekHigh as number | null)}\n\nMetriche tecniche calcolate:\n- SMA 50: ${money(metrics.sma50 as number | null, currency)}\n- SMA 200: ${money(metrics.sma200 as number | null, currency)}\n- RSI 14: ${round(metrics.rsi14 as number | null, 1) ?? "n/d"}\n- Volatilita annualizzata: ${percent(metrics.annualizedVolatility as number | null)}\n- Max drawdown storico disponibile: ${percent(metrics.maxDrawdown as number | null)}\n- Volume medio 30 sedute: ${compactNumber(metrics.averageVolume30 as number | null)}\n- Regime trend: ${metrics.trend}\n\nFondamentali principali:\n- Market cap: ${compactNumber(numeric(quote.marketCap))}\n- P/E trailing: ${round(numeric(quote.trailingPE), 2) ?? "n/d"}\n- P/E forward: ${round(numeric(quote.forwardPE), 2) ?? "n/d"}\n- EPS trailing: ${round(numeric(quote.epsTrailingTwelveMonths), 2) ?? "n/d"}\n- Dividend yield: ${percent(typeof quote.dividendYield === "number" ? numeric(quote.dividendYield) * 100 : null)}\n- Beta: ${round(numeric(quote.beta), 2) ?? "n/d"}\n\nIstruzioni: usa questi dati come base del report, non inventare metriche mancanti, e suggerisci sempre verifica su TradingView/Yahoo prima dell'esecuzione.`;
 }
 
 async function getMarketData(query: string) {
@@ -219,9 +227,9 @@ async function getMarketData(query: string) {
     trend: trendLabel(lastClose, sma50, sma200),
   };
 
-  const displayName = quote.longName || quote.shortName || match.longname || match.shortname || symbol;
-  const exchange = quote.fullExchangeName || quote.exchange || match.exchDisp;
-  const currency = quote.currency;
+  const displayName = textValue(quote.longName) || textValue(quote.shortName) || textValue(match.longname) || textValue(match.shortname) || symbol;
+  const exchange = textValue(quote.fullExchangeName) || textValue(quote.exchange) || textValue(match.exchDisp);
+  const currency = textValue(quote.currency);
   const links = {
     yahoo: `https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}`,
     tradingView: `https://www.tradingview.com/symbols/${encodeURIComponent(symbol.replace(".", "-"))}/`,
@@ -232,21 +240,21 @@ async function getMarketData(query: string) {
     displayName,
     exchange,
     currency,
-    quoteType: quote.quoteType || match.quoteType,
+    quoteType: textValue(quote.quoteType) || textValue(match.quoteType),
     source: "Yahoo Finance",
     links,
     quote: {
-      regularMarketPrice: round(quote.regularMarketPrice, 2),
-      regularMarketChangePercent: round(quote.regularMarketChangePercent, 2),
-      marketCap: quote.marketCap ?? null,
-      trailingPE: round(quote.trailingPE, 2),
-      forwardPE: round(quote.forwardPE, 2),
-      epsTrailingTwelveMonths: round(quote.epsTrailingTwelveMonths, 2),
-      dividendYield: round(typeof quote.dividendYield === "number" ? quote.dividendYield * 100 : null, 2),
-      beta: round(quote.beta, 2),
-      fiftyTwoWeekHigh: round(quote.fiftyTwoWeekHigh, 2),
-      fiftyTwoWeekLow: round(quote.fiftyTwoWeekLow, 2),
-      averageDailyVolume3Month: quote.averageDailyVolume3Month ?? null,
+      regularMarketPrice: round(numeric(quote.regularMarketPrice), 2),
+      regularMarketChangePercent: round(numeric(quote.regularMarketChangePercent), 2),
+      marketCap: numeric(quote.marketCap),
+      trailingPE: round(numeric(quote.trailingPE), 2),
+      forwardPE: round(numeric(quote.forwardPE), 2),
+      epsTrailingTwelveMonths: round(numeric(quote.epsTrailingTwelveMonths), 2),
+      dividendYield: round(numeric(quote.dividendYield) === null ? null : Number(numeric(quote.dividendYield)) * 100, 2),
+      beta: round(numeric(quote.beta), 2),
+      fiftyTwoWeekHigh: round(numeric(quote.fiftyTwoWeekHigh), 2),
+      fiftyTwoWeekLow: round(numeric(quote.fiftyTwoWeekLow), 2),
+      averageDailyVolume3Month: numeric(quote.averageDailyVolume3Month),
     },
     metrics,
     history: pricePoints.slice(-260).map((point) => ({
@@ -259,7 +267,7 @@ async function getMarketData(query: string) {
       symbol,
       exchange,
       currency,
-      quoteType: quote.quoteType || match.quoteType,
+      quoteType: textValue(quote.quoteType) || textValue(match.quoteType),
       quote: quote as unknown as Record<string, unknown>,
       metrics,
       links,
