@@ -67,6 +67,11 @@ type MarketData = {
     currentPriceRiskPercent: number | null;
     target1: number | null;
     target2: number | null;
+    target1Probability: number | null;
+    target2Probability: number | null;
+    targetProbabilityHorizon: string | null;
+    targetProbabilitySampleSize: number | null;
+    targetProbabilityMethod: string;
     sellZoneLow: number | null;
     sellZoneHigh: number | null;
     upsideToTarget1Percent: number | null;
@@ -532,6 +537,15 @@ export default function Home() {
               : "Waiting for stock"}
           </strong>
           <small>Target 1 / Target 2</small>
+        </article>
+        <article className="insight-card odds-card">
+          <span>Target odds</span>
+          <strong>
+            {marketData
+              ? `${formatPercent(marketData.tradeLevels.target1Probability)} / ${formatPercent(marketData.tradeLevels.target2Probability)}`
+              : "-- / --"}
+          </strong>
+          <small>Target 1 / Target 2 probability</small>
         </article>
         <article className="insight-card risk-card">
           <span>Risk to stop</span>

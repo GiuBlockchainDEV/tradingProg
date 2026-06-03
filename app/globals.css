@@ -274,7 +274,7 @@ h1 {
 
 .insight-grid {
   display: grid;
-  grid-template-columns: 1.1fr repeat(3, 1fr);
+  grid-template-columns: 1.15fr repeat(4, 1fr);
   gap: 14px;
   margin-top: 18px;
 }
@@ -304,6 +304,7 @@ h1 {
 }
 .primary-score { border-color: rgba(0,230,118,0.32); background: linear-gradient(160deg, rgba(0,230,118,0.16), rgba(255,255,255,0.04)); }
 .primary-score strong { color: var(--green); font-size: clamp(2.4rem, 5vw, 4.2rem); }
+.odds-card strong { color: var(--green-2); }
 .risk-card strong { color: var(--amber); }
 
 .market-summary {

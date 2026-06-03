@@ -49,4 +49,6 @@ The `/api/market-data` route accepts a stock name or ticker, resolves the symbol
 
 ## Buy / Sell / Risk levels
 
-The backend calculates educational trade levels from market data using recent support/resistance and ATR-style volatility: suggested buy zone, preferred buy price, stop-loss, percentage risk to stop, target 1, target 2, sell/trim zone, upside percentages, and reward/risk. Gemini is instructed to include these levels in every report and to say when waiting for a pullback is better than buying immediately.
+The backend calculates educational trade levels from market data using recent support/resistance and ATR-style volatility: suggested buy zone, preferred buy price, stop-loss, percentage risk to stop, target 1, target 2, conservative target-hit probabilities, sell/trim zone, upside percentages, and reward/risk. Gemini is instructed to include these levels in every report and to say when waiting for a pullback is better than buying immediately.
+
+Target probabilities are estimated objectively from historical target-before-stop hit rates using a same-day stop-first assumption and a conservative haircut. They are not optimistic forecasts and should be treated as rough educational probabilities, not guarantees.

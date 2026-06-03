@@ -177,6 +177,11 @@ function calculateTradeLevels(args: {
       currentPriceRiskPercent: null,
       target1: null,
       target2: null,
+      target1Probability: null,
+      target2Probability: null,
+      targetProbabilityHorizon: null,
+      targetProbabilitySampleSize: null,
+      targetProbabilityMethod: "Insufficient price data for objective probability estimate",
       sellZoneLow: null,
       sellZoneHigh: null,
       upsideToTarget1Percent: null,
@@ -226,6 +231,74 @@ function calculateTradeLevels(args: {
     support20: round(args.recentSupport, 2),
     resistance20: round(args.recentResistance, 2),
     method: "ATR- and support/resistance-based educational levels; verify with live chart before execution",
+  };
+}
+
+function estimateTargetProbability(args: {
+  points: PricePoint[];
+  targetReturnPercent: number | null;
+  riskPercent: number | null;
+  horizonSessions: number;
+}) {
+  if (
+    args.targetReturnPercent === null ||
+    args.riskPercent === null ||
+    args.targetReturnPercent <= 0 ||
+    args.riskPercent <= 0 ||
+    args.points.length <= args.horizonSessions + 30
+  ) {
+    return {
+      probability: null,
+      sampleSize: 0,
+      method: "Insufficient historical sample for objective target probability",
+    };
+  }
+
+  let successes = 0;
+  let observations = 0;
+  const maxStart = args.points.length - args.horizonSessions - 1;
+
+  for (let index = 0; index <= maxStart; index += 1) {
+    const entry = args.points[index].close;
+    if (typeof entry !== "number" || entry <= 0) {
+      continue;
+    }
+
+    const targetPrice = entry * (1 + args.targetReturnPercent / 100);
+    const stopPrice = entry * (1 - args.riskPercent / 100);
+    observations += 1;
+
+    for (let forward = index + 1; forward <= index + args.horizonSessions; forward += 1) {
+      const high = args.points[forward].high ?? args.points[forward].close;
+      const low = args.points[forward].low ?? args.points[forward].close;
+
+      // Conservative ordering: if stop and target happen in the same session, count the stop first.
+      if (typeof low === "number" && low <= stopPrice) {
+        break;
+      }
+
+      if (typeof high === "number" && high >= targetPrice) {
+        successes += 1;
+        break;
+      }
+    }
+  }
+
+  if (observations === 0) {
+    return {
+      probability: null,
+      sampleSize: 0,
+      method: "Insufficient historical sample for objective target probability",
+    };
+  }
+
+  // Haircut the empirical hit rate to avoid optimistic target probabilities.
+  const conservativeProbability = (successes / observations) * 100 * 0.9;
+
+  return {
+    probability: round(conservativeProbability, 2),
+    sampleSize: observations,
+    method: "Conservative empirical hit rate: historical target-before-stop frequency with same-day stop priority and 10% haircut",
   };
 }
 
@@ -401,7 +474,10 @@ Objective buy/sell/risk levels:
 - Risk from preferred buy to stop: ${percent(tradeLevels.riskPercent as number | null)}
 - Current-price downside to stop: ${percent(tradeLevels.currentPriceRiskPercent as number | null)}
 - Target 1 / first sell zone: ${money(tradeLevels.target1 as number | null, currency)} (${percent(tradeLevels.upsideToTarget1Percent as number | null)} upside; R/R ${round(tradeLevels.rewardRiskTarget1 as number | null, 2) ?? "n/a"})
+- Target 1 probability: ${percent(tradeLevels.target1Probability as number | null)} over ~63 trading sessions
 - Target 2 / extended sell zone: ${money(tradeLevels.target2 as number | null, currency)} (${percent(tradeLevels.upsideToTarget2Percent as number | null)} upside; R/R ${round(tradeLevels.rewardRiskTarget2 as number | null, 2) ?? "n/a"})
+- Target 2 probability: ${percent(tradeLevels.target2Probability as number | null)} over ~126 trading sessions
+- Probability method: ${tradeLevels.targetProbabilityMethod}
 - Method: ${tradeLevels.method}
 
 Price and performance:
@@ -477,13 +553,33 @@ async function getMarketData(query: string) {
   const recent20 = pricePoints.slice(-20);
   const recentSupport = recent20.length > 0 ? Math.min(...recent20.map((point) => Number(point.low ?? point.close)).filter(Number.isFinite)) : null;
   const recentResistance = recent20.length > 0 ? Math.max(...recent20.map((point) => Number(point.high ?? point.close)).filter(Number.isFinite)) : null;
-  const tradeLevels = calculateTradeLevels({
+  const tradeLevelsBase = calculateTradeLevels({
     lastClose,
     sma50,
     atr14,
     recentSupport,
     recentResistance,
   });
+  const target1Probability = estimateTargetProbability({
+    points: pricePoints,
+    targetReturnPercent: tradeLevelsBase.upsideToTarget1Percent,
+    riskPercent: tradeLevelsBase.riskPercent,
+    horizonSessions: 63,
+  });
+  const target2Probability = estimateTargetProbability({
+    points: pricePoints,
+    targetReturnPercent: tradeLevelsBase.upsideToTarget2Percent,
+    riskPercent: tradeLevelsBase.riskPercent,
+    horizonSessions: 126,
+  });
+  const tradeLevels = {
+    ...tradeLevelsBase,
+    target1Probability: target1Probability.probability,
+    target2Probability: target2Probability.probability,
+    targetProbabilityHorizon: "Target 1: 63 trading sessions; Target 2: 126 trading sessions",
+    targetProbabilitySampleSize: Math.min(target1Probability.sampleSize, target2Probability.sampleSize),
+    targetProbabilityMethod: `${target1Probability.method}; ${target2Probability.method}`,
+  };
   const baseMetrics = {
     lastClose: round(lastClose, 2),
     oneYearReturn: round(oneYearReturn, 2),
