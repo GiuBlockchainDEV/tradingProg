@@ -41,24 +41,24 @@ function round(value: number | null | undefined, digits = 2) {
 
 function percent(value: number | null | undefined, digits = 2) {
   const rounded = round(value, digits);
-  return rounded === null ? "n/d" : `${rounded}%`;
+  return rounded === null ? "n/a" : `${rounded}%`;
 }
 
 function money(value: number | null | undefined, currency?: string) {
   const rounded = round(value, 2);
   if (rounded === null) {
-    return "n/d";
+    return "n/a";
   }
 
-  return `${currency ? `${currency} ` : ""}${rounded.toLocaleString("it-IT")}`;
+  return `${currency ? `${currency} ` : ""}${rounded.toLocaleString("en-US")}`;
 }
 
 function compactNumber(value: number | null | undefined) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
-    return "n/d";
+    return "n/a";
   }
 
-  return new Intl.NumberFormat("it-IT", {
+  return new Intl.NumberFormat("en-US", {
     notation: "compact",
     maximumFractionDigits: 2,
   }).format(value);
@@ -146,18 +146,125 @@ function annualizedReturn(closes: number[], firstDate?: Date, lastDate?: Date) {
 
 function trendLabel(lastClose: number | null, sma50: number | null, sma200: number | null) {
   if (lastClose === null || sma50 === null || sma200 === null) {
-    return "Dati insufficienti";
+    return "Insufficient data";
   }
 
   if (lastClose > sma50 && sma50 > sma200) {
-    return "Bullish: prezzo sopra SMA50 e SMA200";
+    return "Bullish: price above SMA50 and SMA200";
   }
 
   if (lastClose < sma50 && sma50 < sma200) {
-    return "Bearish: prezzo sotto SMA50 e SMA200";
+    return "Bearish: price below SMA50 and SMA200";
   }
 
-  return "Laterale/misto: segnali trend non allineati";
+  return "Sideways/mixed: trend signals are not aligned";
+}
+
+function clamp(value: number, min = 0, max = 100) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function scoreLabel(score: number) {
+  if (score >= 80) return "Strong";
+  if (score >= 65) return "Constructive";
+  if (score >= 50) return "Neutral";
+  if (score >= 35) return "Weak";
+  return "High risk";
+}
+
+function calculateInvestmentScore(args: {
+  lastClose: number | null;
+  sma50: number | null;
+  sma200: number | null;
+  oneYearReturn: number | null;
+  annualizedReturn: number | null;
+  annualizedVolatility: number | null;
+  maxDrawdown: number | null;
+  rsi14: number | null;
+  distanceFrom52WeekHigh: number | null;
+  averageVolume30: number | null;
+  trailingPE: number | null;
+  forwardPE: number | null;
+}) {
+  let score = 50;
+  const drivers: string[] = [];
+
+  if (args.lastClose !== null && args.sma50 !== null && args.sma200 !== null) {
+    if (args.lastClose > args.sma50 && args.sma50 > args.sma200) {
+      score += 15;
+      drivers.push("positive trend alignment");
+    } else if (args.lastClose < args.sma50 && args.sma50 < args.sma200) {
+      score -= 18;
+      drivers.push("negative trend alignment");
+    } else {
+      score -= 3;
+      drivers.push("mixed trend alignment");
+    }
+  } else {
+    score -= 4;
+    drivers.push("limited trend data");
+  }
+
+  const returnSignal = args.oneYearReturn ?? args.annualizedReturn;
+  if (returnSignal !== null) {
+    if (returnSignal > 25) score += 10;
+    else if (returnSignal > 10) score += 7;
+    else if (returnSignal > 0) score += 3;
+    else if (returnSignal > -10) score -= 6;
+    else score -= 12;
+    drivers.push(`return signal ${round(returnSignal, 1)}%`);
+  }
+
+  if (args.annualizedVolatility !== null) {
+    if (args.annualizedVolatility < 20) score += 8;
+    else if (args.annualizedVolatility < 35) score += 2;
+    else if (args.annualizedVolatility < 55) score -= 8;
+    else score -= 15;
+    drivers.push(`annualized volatility ${round(args.annualizedVolatility, 1)}%`);
+  }
+
+  if (args.maxDrawdown !== null) {
+    if (args.maxDrawdown > -20) score += 8;
+    else if (args.maxDrawdown > -35) score += 1;
+    else if (args.maxDrawdown > -55) score -= 8;
+    else score -= 14;
+    drivers.push(`max drawdown ${round(args.maxDrawdown, 1)}%`);
+  }
+
+  if (args.rsi14 !== null) {
+    if (args.rsi14 >= 45 && args.rsi14 <= 65) score += 6;
+    else if ((args.rsi14 >= 35 && args.rsi14 < 45) || (args.rsi14 > 65 && args.rsi14 <= 75)) score += 1;
+    else score -= 6;
+    drivers.push(`RSI 14 ${round(args.rsi14, 1)}`);
+  }
+
+  const pe = args.forwardPE ?? args.trailingPE;
+  if (pe !== null) {
+    if (pe > 0 && pe < 18) score += 7;
+    else if (pe < 30) score += 2;
+    else if (pe < 50) score -= 5;
+    else score -= 10;
+    drivers.push(`valuation P/E ${round(pe, 1)}`);
+  }
+
+  if (args.distanceFrom52WeekHigh !== null) {
+    if (args.distanceFrom52WeekHigh > -10) score += 4;
+    else if (args.distanceFrom52WeekHigh < -35) score -= 7;
+    drivers.push(`distance from 52-week high ${round(args.distanceFrom52WeekHigh, 1)}%`);
+  }
+
+  if (args.averageVolume30 !== null) {
+    if (args.averageVolume30 > 1_000_000) score += 3;
+    else if (args.averageVolume30 < 100_000) score -= 5;
+    drivers.push("liquidity check included");
+  }
+
+  const finalScore = Math.round(clamp(score));
+  return {
+    score: finalScore,
+    label: scoreLabel(finalScore),
+    drivers,
+  };
 }
 
 function buildPromptContext(args: {
@@ -172,8 +279,47 @@ function buildPromptContext(args: {
 }) {
   const { displayName, symbol, exchange, currency, quoteType, quote, metrics, links } = args;
 
-  return `Dati mercato recuperati automaticamente da Yahoo Finance per ${displayName} (${symbol}).\nFonte numerica: Yahoo Finance quote, quoteSummary e chart 5Y. Link di verifica: Yahoo ${links.yahoo}; TradingView ${links.tradingView}.\nTimestamp: ${new Date().toISOString()}\n\nIdentificazione:\n- Nome: ${displayName}\n- Simbolo: ${symbol}\n- Exchange: ${exchange || "n/d"}\n- Tipo: ${quoteType || "n/d"}\n- Valuta: ${currency || "n/d"}\n\nPrezzo e performance:\n- Prezzo corrente: ${money(numeric(quote.regularMarketPrice), currency)}\n- Variazione giornaliera: ${percent(numeric(quote.regularMarketChangePercent))}\n- Rendimento 1Y: ${percent(metrics.oneYearReturn as number | null)}\n- CAGR 5Y/storico disponibile: ${percent(metrics.annualizedReturn as number | null)}\n- Distanza da massimo 52 settimane: ${percent(metrics.distanceFrom52WeekHigh as number | null)}\n\nMetriche tecniche calcolate:\n- SMA 50: ${money(metrics.sma50 as number | null, currency)}\n- SMA 200: ${money(metrics.sma200 as number | null, currency)}\n- RSI 14: ${round(metrics.rsi14 as number | null, 1) ?? "n/d"}\n- Volatilita annualizzata: ${percent(metrics.annualizedVolatility as number | null)}\n- Max drawdown storico disponibile: ${percent(metrics.maxDrawdown as number | null)}\n- Volume medio 30 sedute: ${compactNumber(metrics.averageVolume30 as number | null)}\n- Regime trend: ${metrics.trend}\n\nFondamentali principali:\n- Market cap: ${compactNumber(numeric(quote.marketCap))}\n- P/E trailing: ${round(numeric(quote.trailingPE), 2) ?? "n/d"}\n- P/E forward: ${round(numeric(quote.forwardPE), 2) ?? "n/d"}\n- EPS trailing: ${round(numeric(quote.epsTrailingTwelveMonths), 2) ?? "n/d"}\n- Dividend yield: ${percent(dividendPercent(quote.dividendYield))}\n- Beta: ${round(numeric(quote.beta), 2) ?? "n/d"}\n\nIstruzioni: usa questi dati come base del report, non inventare metriche mancanti, e suggerisci sempre verifica su TradingView/Yahoo prima dell'esecuzione.`;
-}
+  return `Market data automatically retrieved from Yahoo Finance for ${displayName} (${symbol}).
+Numerical source: Yahoo Finance quote and 5Y daily chart. Verification links: Yahoo ${links.yahoo}; TradingView ${links.tradingView}.
+Timestamp: ${new Date().toISOString()}
+
+Identification:
+- Name: ${displayName}
+- Symbol: ${symbol}
+- Exchange: ${exchange || "n/a"}
+- Type: ${quoteType || "n/a"}
+- Currency: ${currency || "n/a"}
+
+Objective investment score:
+- Score: ${metrics.investmentScore}/100
+- Label: ${metrics.investmentScoreLabel}
+- Main drivers: ${metrics.investmentScoreDrivers || "n/a"}
+
+Price and performance:
+- Current price: ${money(numeric(quote.regularMarketPrice), currency)}
+- Daily change: ${percent(numeric(quote.regularMarketChangePercent))}
+- 1Y return: ${percent(metrics.oneYearReturn as number | null)}
+- 5Y/available-history CAGR: ${percent(metrics.annualizedReturn as number | null)}
+- Distance from 52-week high: ${percent(metrics.distanceFrom52WeekHigh as number | null)}
+
+Calculated technical metrics:
+- SMA 50: ${money(metrics.sma50 as number | null, currency)}
+- SMA 200: ${money(metrics.sma200 as number | null, currency)}
+- RSI 14: ${round(metrics.rsi14 as number | null, 1) ?? "n/a"}
+- Annualized volatility: ${percent(metrics.annualizedVolatility as number | null)}
+- Max drawdown over available history: ${percent(metrics.maxDrawdown as number | null)}
+- 30-session average volume: ${compactNumber(metrics.averageVolume30 as number | null)}
+- Trend regime: ${metrics.trend}
+
+Key fundamentals:
+- Market cap: ${compactNumber(numeric(quote.marketCap))}
+- Trailing P/E: ${round(numeric(quote.trailingPE), 2) ?? "n/a"}
+- Forward P/E: ${round(numeric(quote.forwardPE), 2) ?? "n/a"}
+- Trailing EPS: ${round(numeric(quote.epsTrailingTwelveMonths), 2) ?? "n/a"}
+- Dividend yield: ${percent(dividendPercent(quote.dividendYield))}
+- Beta: ${round(numeric(quote.beta), 2) ?? "n/a"}
+
+Instructions: use these data points as the base for the report, do not invent missing metrics, keep the investment score visible, and recommend verification on TradingView/Yahoo before execution.`;}
 
 async function getMarketData(query: string) {
   const search = await yahooFinance.search(query, { quotesCount: 8, newsCount: 0 }) as unknown as { quotes?: Array<Record<string, string>> };
@@ -181,7 +327,7 @@ async function getMarketData(query: string) {
   const match = quotes.find((quote) => PREFERRED_TYPES.has(String(quote.quoteType))) ?? quotes[0];
 
   if (!match?.symbol) {
-    throw new Error(`Nessun simbolo trovato per "${query}".`);
+    throw new Error(`No symbol found for "${query}".`);
   }
 
   const symbol = match.symbol;
@@ -218,7 +364,7 @@ async function getMarketData(query: string) {
   const high52Week = closes252.length > 0 ? Math.max(...closes252) : null;
   const low52Week = closes252.length > 0 ? Math.min(...closes252) : null;
   const averageVolume30 = mean(pricePoints.slice(-30).map((point) => Number(point.volume)).filter(Number.isFinite));
-  const metrics = {
+  const baseMetrics = {
     lastClose: round(lastClose, 2),
     oneYearReturn: round(oneYearReturn, 2),
     annualizedReturn: round(annualizedReturn(closes, pricePoints[0]?.date, pricePoints[pricePoints.length - 1]?.date), 2),
@@ -232,6 +378,26 @@ async function getMarketData(query: string) {
     distanceFrom52WeekHigh: high52Week && lastClose ? round((lastClose / high52Week - 1) * 100, 2) : null,
     averageVolume30: round(averageVolume30, 0),
     trend: trendLabel(lastClose, sma50, sma200),
+  };
+  const investmentScore = calculateInvestmentScore({
+    lastClose,
+    sma50,
+    sma200,
+    oneYearReturn,
+    annualizedReturn: baseMetrics.annualizedReturn,
+    annualizedVolatility,
+    maxDrawdown: maxDrawdown(closes),
+    rsi14: baseMetrics.rsi14,
+    distanceFrom52WeekHigh: baseMetrics.distanceFrom52WeekHigh,
+    averageVolume30,
+    trailingPE: numeric(quote.trailingPE),
+    forwardPE: numeric(quote.forwardPE),
+  });
+  const metrics = {
+    ...baseMetrics,
+    investmentScore: investmentScore.score,
+    investmentScoreLabel: investmentScore.label,
+    investmentScoreDrivers: investmentScore.drivers.join(", "),
   };
 
   const displayName = textValue(quote.longName) || textValue(quote.shortName) || textValue(match.longname) || textValue(match.shortname) || symbol;
@@ -288,19 +454,19 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Payload JSON non valido." }, { status: 400 });
+    return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
   }
 
   const query = body.query?.trim();
   if (!query) {
-    return NextResponse.json({ error: "Inserisci nome o ticker della stock." }, { status: 400 });
+    return NextResponse.json({ error: "Enter a stock name or ticker." }, { status: 400 });
   }
 
   try {
     const data = await getMarketData(query);
     return NextResponse.json(data);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Errore sconosciuto nel recupero dati mercato.";
+    const message = error instanceof Error ? error.message : "Unknown error while retrieving market data.";
     return NextResponse.json({ error: message }, { status: 502 });
   }
 }
@@ -310,14 +476,14 @@ export async function GET(request: Request) {
   const query = searchParams.get("q")?.trim();
 
   if (!query) {
-    return NextResponse.json({ error: "Parametro q richiesto." }, { status: 400 });
+    return NextResponse.json({ error: "Query parameter q is required." }, { status: 400 });
   }
 
   try {
     const data = await getMarketData(query);
     return NextResponse.json(data);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Errore sconosciuto nel recupero dati mercato.";
+    const message = error instanceof Error ? error.message : "Unknown error while retrieving market data.";
     return NextResponse.json({ error: message }, { status: 502 });
   }
 }

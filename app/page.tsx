@@ -54,6 +54,9 @@ type MarketData = {
     distanceFrom52WeekHigh: number | null;
     averageVolume30: number | null;
     trend: string;
+    investmentScore: number;
+    investmentScoreLabel: string;
+    investmentScoreDrivers: string;
   };
   promptContext: string;
 };
@@ -64,97 +67,97 @@ const workflows: Workflow[] = [
     id: "strategy_generation",
     number: "01",
     title: "Strategy Generation",
-    short: "3 strategie complete con indicatori, entry, exit e edge.",
+    short: "3 complete strategies with indicators, entries, exits, and edge rationale.",
     tags: ["edge", "rules", "signals"],
-    placeholder: "Esempio: crypto large cap, timeframe 1D, capitale 10.000 EUR, rischio 1% per trade.",
+    placeholder: "Example: large-cap crypto, 1D timeframe, EUR 10,000 capital, 1% risk per trade.",
   },
   {
     id: "backtesting",
     number: "02",
     title: "Backtesting",
-    short: "CAGR, Sharpe, max drawdown, win rate e sintesi.",
+    short: "CAGR, Sharpe, max drawdown, win rate, and summary.",
     tags: ["CAGR", "Sharpe", "MDD"],
-    placeholder: "Incolla regole della strategia e, se li hai, risultati o dati storici OHLCV.",
+    placeholder: "Paste strategy rules and, if available, results or OHLCV history.",
   },
   {
     id: "risk_reward",
     number: "03",
     title: "Risk-Reward Analysis",
-    short: "Rischio per trade, R/R, drawdown e miglioramenti.",
+    short: "Risk per trade, R/R, drawdown, and improvements.",
     tags: ["risk", "R/R", "sizing"],
-    placeholder: "Descrivi setup, stop, target e frequenza operativa della strategia.",
+    placeholder: "Describe setup, stop, target, and operating frequency.",
   },
   {
     id: "market_regime",
     number: "04",
     title: "Market Regime Detection",
-    short: "Trend, volatilita, volumi, cosa fare e cosa evitare.",
+    short: "Trend, volatility, volume, what to do, and what to avoid.",
     tags: ["trend", "volatility", "volume"],
-    placeholder: "Indica asset, timeframe e dati recenti: prezzo, medie mobili, volatilita, volumi.",
+    placeholder: "Enter asset, timeframe, and recent data: price, moving averages, volatility, and volume.",
   },
   {
     id: "multi_factor",
     number: "05",
     title: "Multi-Factor Strategy",
-    short: "Momentum, value, volatility e trend in un modello pesato.",
+    short: "Momentum, value, volatility, and trend in a weighted model.",
     tags: ["factor", "weights", "rebalance"],
-    placeholder: "Elenca universo investibile, frequenza di ribilanciamento e vincoli di rischio.",
+    placeholder: "List investable universe, rebalancing frequency, and risk constraints.",
   },
   {
     id: "optimization",
     number: "06",
     title: "Strategy Optimization",
-    short: "Migliora Sharpe, drawdown, timing e filtri.",
+    short: "Improve Sharpe, drawdown, timing, and filters.",
     tags: ["filters", "timing", "before/after"],
-    placeholder: "Incolla la strategia attuale con indicatori, parametri, entry, exit e limiti noti.",
+    placeholder: "Paste the current strategy with indicators, parameters, entries, exits, and known limitations.",
   },
   {
     id: "portfolio",
     number: "07",
     title: "Portfolio Construction",
-    short: "Allocazioni, rendimento atteso, rischio e razionale.",
+    short: "Allocations, expected return, risk, and rationale.",
     tags: ["allocation", "risk", "horizon"],
-    placeholder: "Esempio asset: SPY, QQQ, GLD, BTC, cash. Orizzonte 1-3 anni, rischio medio.",
+    placeholder: "Example assets: SPY, QQQ, GLD, BTC, cash. 1-3 year horizon, medium risk.",
   },
   {
     id: "trade_setup",
     number: "08",
     title: "Trade Setup Generation",
-    short: "3 trade con entry, stop, take profit e motivazione.",
+    short: "3 trades with entry, stop, take profit, and reasoning.",
     tags: ["entry", "SL", "TP"],
-    placeholder: "Indica mercato, direzione preferita, livelli chiave, news/macro e timeframe.",
+    placeholder: "Enter market, preferred direction, key levels, news/macro context, and timeframe.",
   },
   {
     id: "monte_carlo",
     number: "09",
     title: "Monte Carlo Simulation",
-    short: "Distribuzione ritorni, perdita probabile e scenari worst case.",
+    short: "Return distribution, probability of loss, and worst-case scenarios.",
     tags: ["simulation", "loss", "robustness"],
-    placeholder: "Fornisci win rate, R medio, numero trade, perdita media e serie risultati se disponibile.",
+    placeholder: "Provide win rate, average R, number of trades, average loss, and result series if available.",
   },
   {
     id: "drawdown",
     number: "10",
     title: "Drawdown Analysis",
-    short: "Max drawdown, recovery time e position sizing.",
+    short: "Max drawdown, recovery time, and position sizing.",
     tags: ["MDD", "recovery", "sizing"],
-    placeholder: "Incolla equity curve, risultati trade o descrizione della strategia da analizzare.",
+    placeholder: "Paste equity curve, trade results, or a strategy description to analyze.",
   },
   {
     id: "macro_strategy",
     number: "11",
     title: "Macro-Based Strategy",
-    short: "Tassi, inflazione, crescita, segnali ed esempi operativi.",
+    short: "Rates, inflation, growth, signals, and operating examples.",
     tags: ["rates", "inflation", "growth"],
-    placeholder: "Descrivi area geografica, asset macro e dati: CPI, PMI, banche centrali, curve tassi.",
+    placeholder: "Describe geography, macro assets, and data: CPI, PMI, central banks, yield curves.",
   },
   {
     id: "alpha_edge",
     number: "12",
     title: "Alpha / Edge Detection",
-    short: "Inefficienze, gap di struttura mercato e strategie poco affollate.",
+    short: "Inefficiencies, market-structure gaps, and less crowded strategies.",
     tags: ["alpha", "behavior", "structure"],
-    placeholder: "Indica mercato, partecipanti dominanti, vincoli, microstruttura e orizzonte operativo.",
+    placeholder: "Enter market, dominant participants, constraints, microstructure, and operating horizon.",
   },
 ];
 
@@ -163,7 +166,7 @@ const starterState: FormState = {
   timeframe: "1D",
   capital: "10000 EUR",
   riskPerTrade: "1%",
-  riskTolerance: "Media",
+  riskTolerance: "Medium",
   timeHorizon: "1-3 anni",
   assets: "AAPL",
   strategyRules: "",
@@ -174,7 +177,7 @@ const starterState: FormState = {
 
 function formatPercent(value: number | null) {
   if (value === null || !Number.isFinite(value)) {
-    return "n/d";
+    return "n/a";
   }
 
   return `${value.toFixed(2)}%`;
@@ -182,7 +185,7 @@ function formatPercent(value: number | null) {
 
 function formatPrice(value: number | null, currency?: string) {
   if (value === null || !Number.isFinite(value)) {
-    return "n/d";
+    return "n/a";
   }
 
   return `${currency ? `${currency} ` : ""}${value.toLocaleString("it-IT", { maximumFractionDigits: 2 })}`;
@@ -190,7 +193,7 @@ function formatPrice(value: number | null, currency?: string) {
 
 function formatCompact(value: number | null) {
   if (value === null || !Number.isFinite(value)) {
-    return "n/d";
+    return "n/a";
   }
 
   return new Intl.NumberFormat("it-IT", {
@@ -333,7 +336,7 @@ export default function Home() {
   function mergeMarketDataIntoForm(data: MarketData, currentForm: FormState) {
     const extraContext = [
       currentForm.extraContext,
-      `Fonti automatiche: Yahoo Finance (${data.links.yahoo}) e TradingView (${data.links.tradingView}).`,
+      `Automatic sources: Yahoo Finance (${data.links.yahoo}) e TradingView (${data.links.tradingView}).`,
     ]
       .filter(Boolean)
       .join("\n\n");
@@ -356,7 +359,7 @@ export default function Home() {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error ?? "Impossibile recuperare i dati mercato.");
+      throw new Error(data.error ?? "Unable to retrieve market data.");
     }
 
     return data as MarketData;
@@ -365,7 +368,7 @@ export default function Home() {
   async function loadMarketData() {
     const query = form.market.trim();
     if (!query) {
-      setError("Inserisci il nome della stock o il ticker.");
+      setError("Enter a stock name or ticker.");
       return null;
     }
 
@@ -378,7 +381,7 @@ export default function Home() {
       setForm((current) => mergeMarketDataIntoForm(data, current));
       return data;
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Errore nel recupero dati mercato.");
+      setError(requestError instanceof Error ? requestError.message : "Error while retrieving market data.");
       return null;
     } finally {
       setIsLoadingMarket(false);
@@ -396,7 +399,7 @@ export default function Home() {
       let dataForPrompt = marketData;
 
       if (form.market.trim()) {
-        const needsFreshData = !marketData || !form.historicalData.includes("Dati mercato recuperati automaticamente");
+        const needsFreshData = !marketData || !form.historicalData.includes("Market data automatically retrieved");
         dataForPrompt = needsFreshData ? await fetchMarketData(form.market) : marketData;
 
         if (dataForPrompt) {
@@ -419,7 +422,7 @@ export default function Home() {
 
       setResult(data.result);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Errore imprevisto.");
+      setError(requestError instanceof Error ? requestError.message : "Unexpected error.");
     } finally {
       setIsLoading(false);
     }
@@ -428,28 +431,28 @@ export default function Home() {
   return (
     <main>
       <section className="hero">
-        <nav className="topbar" aria-label="Navigazione principale">
+        <nav className="topbar" aria-label="Main navigation">
           <div className="brand-mark">
             <span className="brand-orb" />
             <span>Gemini TradeLab</span>
           </div>
           <div className="topbar-actions">
             <span className="status-pill">AI Research</span>
-            <a href="#workspace" className="ghost-link">Apri terminale</a>
+            <a href="#workspace" className="ghost-link">Open terminal</a>
           </div>
         </nav>
 
         <div className="hero-grid">
           <div className="hero-copy">
             <span className="eyebrow">Trading intelligence powered by Gemini</span>
-            <h1>Una suite Next.js per strategie, backtest, rischio e portfolio.</h1>
+            <h1>A Next.js suite for strategies, backtests, risk, and portfolios.</h1>
             <p>
-              Trasforma prompt di ricerca trading in workflow operativi: genera strategie, analizza drawdown,
-              costruisci portafogli e crea setup con una UI fintech verde, veloce e responsive.
+              Turn trading research prompts into operating workflows: generate strategies, analyze drawdowns,
+              build portfolios, and create setups with a fast, responsive green fintech UI.
             </p>
             <div className="hero-actions">
-              <a className="primary-cta" href="#workspace">Genera analisi</a>
-              <a className="secondary-cta" href="#modules">Vedi moduli</a>
+              <a className="primary-cta" href="#workspace">Generate analysis</a>
+              <a className="secondary-cta" href="#modules">View modules</a>
             </div>
           </div>
 
@@ -483,10 +486,10 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="module-strip" id="modules" aria-label="Metriche principali">
+      <section className="module-strip" id="modules" aria-label="Key metrics">
         <div>
           <strong>12</strong>
-          <span>moduli trading</span>
+          <span>trading modules</span>
         </div>
         <div>
           <strong>Gemini</strong>
@@ -533,7 +536,7 @@ export default function Home() {
         <div className="terminal-panel">
           <div className="terminal-header">
             <div>
-              <span>Modulo attivo</span>
+              <span>Active module</span>
               <h2>{activeWorkflow.title}</h2>
             </div>
             <span className="status-pill">{activeWorkflow.number}/12</span>
@@ -542,52 +545,57 @@ export default function Home() {
           <form onSubmit={submitAnalysis} className="analysis-form">
             <div className="stock-search-card">
               <label>
-                Nome stock o ticker
+                Stock name or ticker
                 <div className="stock-input-row">
                   <input
                     value={form.market}
                     onChange={(event) => updateField("market", event.target.value)}
-                    placeholder="Esempio: Apple, Tesla, NVDA, Microsoft"
+                    placeholder="Example: Apple, Tesla, NVDA, Microsoft"
                   />
                   <button disabled={isLoadingMarket || isLoading} onClick={loadMarketData} type="button">
-                    {isLoadingMarket ? "Carico..." : "Carica metriche"}
+                    {isLoadingMarket ? "Loading..." : "Load metrics"}
                   </button>
                 </div>
               </label>
               <p>
-                Inserisci solo il nome della stock: l&apos;app risolve il ticker, scarica quote e storico da Yahoo Finance e aggiunge link TradingView per verifica grafica.
+                Enter only the stock name: the app resolves the ticker, retrieves quotes and historical data from Yahoo Finance, and adds TradingView links for chart verification.
               </p>
               {marketData && (
                 <div className="metric-preview-grid">
+                  <div className="metric-mini-card score-card">
+                    <span>Investment Score</span>
+                    <strong>{marketData.metrics.investmentScore}/100</strong>
+                    <small>{marketData.metrics.investmentScoreLabel}</small>
+                  </div>
                   <div className="metric-mini-card">
-                    <span>Simbolo</span>
+                    <span>Symbol</span>
                     <strong>{marketData.symbol}</strong>
                     <small>{marketData.exchange || marketData.source}</small>
                   </div>
                   <div className="metric-mini-card">
-                    <span>Prezzo</span>
+                    <span>Price</span>
                     <strong>{formatPrice(marketData.quote.regularMarketPrice, marketData.currency)}</strong>
-                    <small>{formatPercent(marketData.quote.regularMarketChangePercent)} oggi</small>
+                    <small>{formatPercent(marketData.quote.regularMarketChangePercent)} today</small>
                   </div>
                   <div className="metric-mini-card">
-                    <span>Volatilita</span>
+                    <span>Volatility</span>
                     <strong>{formatPercent(marketData.metrics.annualizedVolatility)}</strong>
-                    <small>annualizzata</small>
+                    <small>annualized</small>
                   </div>
                   <div className="metric-mini-card">
                     <span>Max drawdown</span>
                     <strong>{formatPercent(marketData.metrics.maxDrawdown)}</strong>
-                    <small>storico disponibile</small>
+                    <small>available history</small>
                   </div>
                   <div className="metric-mini-card">
                     <span>RSI 14</span>
-                    <strong>{marketData.metrics.rsi14 ?? "n/d"}</strong>
+                    <strong>{marketData.metrics.rsi14 ?? "n/a"}</strong>
                     <small>{marketData.metrics.trend}</small>
                   </div>
                   <div className="metric-mini-card">
                     <span>Market cap</span>
                     <strong>{formatCompact(marketData.quote.marketCap)}</strong>
-                    <small>P/E {marketData.quote.trailingPE ?? "n/d"}</small>
+                    <small>P/E {marketData.quote.trailingPE ?? "n/a"}</small>
                   </div>
                 </div>
               )}
@@ -605,34 +613,34 @@ export default function Home() {
                 <input value={form.timeframe} onChange={(event) => updateField("timeframe", event.target.value)} />
               </label>
               <label>
-                Capitale
+                Capital
                 <input value={form.capital} onChange={(event) => updateField("capital", event.target.value)} />
               </label>
               <label>
-                Rischio per trade
+                Risk per trade
                 <input value={form.riskPerTrade} onChange={(event) => updateField("riskPerTrade", event.target.value)} />
               </label>
               <label>
-                Tolleranza rischio
+                Risk tolerance
                 <select value={form.riskTolerance} onChange={(event) => updateField("riskTolerance", event.target.value)}>
-                  <option>Bassa</option>
-                  <option>Media</option>
-                  <option>Alta</option>
+                  <option>Low</option>
+                  <option>Medium</option>
+                  <option>High</option>
                 </select>
               </label>
               <label>
-                Orizzonte
+                Horizon
                 <input value={form.timeHorizon} onChange={(event) => updateField("timeHorizon", event.target.value)} />
               </label>
             </div>
 
             <label>
-              Asset list / Universo investibile
+              Asset list / Investable universe
               <input value={form.assets} onChange={(event) => updateField("assets", event.target.value)} />
             </label>
 
             <label>
-              Regole strategia o richiesta principale
+              Strategy rules or main request
               <textarea
                 value={form.strategyRules}
                 onChange={(event) => updateField("strategyRules", event.target.value)}
@@ -642,27 +650,27 @@ export default function Home() {
             </label>
 
             <label>
-              Dati storici, metriche o osservazioni di mercato
+              Historical data, metrics, or market observations
               <textarea
                 value={form.historicalData}
                 onChange={(event) => updateField("historicalData", event.target.value)}
-                placeholder="Incolla OHLCV, trade log, equity curve, metriche precedenti o livelli tecnici."
+                placeholder="Paste OHLCV, trade log, equity curve, previous metrics, or technical levels."
                 rows={4}
               />
             </label>
 
             <label>
-              Note extra
+              Extra notes
               <textarea
                 value={form.extraContext}
                 onChange={(event) => updateField("extraContext", event.target.value)}
-                placeholder="Vincoli, broker, commissioni, strumenti esclusi, preferenze operative."
+                placeholder="Constraints, broker, fees, excluded instruments, operating preferences."
                 rows={3}
               />
             </label>
 
             <button className="submit-button" disabled={isLoading} type="submit">
-              {isLoading ? "Gemini sta elaborando..." : "Genera report con dati mercato + Gemini"}
+              {isLoading ? "Gemini is processing..." : "Generate report with market data + Gemini"}
             </button>
           </form>
         </div>
@@ -671,13 +679,13 @@ export default function Home() {
       <section className="output-section" aria-live="polite">
         <div className="section-heading">
           <span>AI output</span>
-          <h2>Report operativo</h2>
+          <h2>Operating report</h2>
         </div>
 
         {!result && !error && (
           <div className="empty-output">
-            <span>Pronto</span>
-            <p>Inserisci il nome della stock, carica le metriche automatiche e genera un report completo con summary, tabelle, regole e rischi.</p>
+            <span>Ready</span>
+            <p>Enter the stock name, load automatic metrics, and generate a complete report with summary, tables, rules, risks, and an objective score.</p>
           </div>
         )}
 

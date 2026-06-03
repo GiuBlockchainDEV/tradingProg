@@ -454,6 +454,16 @@ h1 {
   letter-spacing: -0.02em;
 }
 
+.metric-mini-card.score-card {
+  border-color: rgba(0, 230, 118, 0.42);
+  background: linear-gradient(135deg, rgba(0, 230, 118, 0.2), rgba(255, 255, 255, 0.045));
+}
+
+.metric-mini-card.score-card strong {
+  color: var(--green);
+  font-size: 1.45rem;
+}
+
 .source-links {
   display: flex;
   flex-wrap: wrap;
