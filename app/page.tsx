@@ -42,6 +42,17 @@ type MarketData = {
     forwardPE: number | null;
     beta: number | null;
     dividendYield: number | null;
+    dividendRate: number | null;
+    trailingAnnualDividendRate: number | null;
+    trailingAnnualDividendYield: number | null;
+    averageDividendPayment: number | null;
+    lastDividendAmount: number | null;
+    lastDividendDate: string | null;
+    dividendPaymentsPerYear: number | null;
+    dividendFrequency: string;
+    exDividendDate: string | null;
+    dividendDate: string | null;
+    dividendHistoryCount: number;
   };
   metrics: {
     oneYearReturn: number | null;
@@ -552,6 +563,15 @@ export default function Home() {
           <strong>{marketData ? formatPercent(marketData.tradeLevels.riskPercent) : "--"}</strong>
           <small>{marketData ? `Stop: ${formatPrice(marketData.tradeLevels.stopLoss, marketData.currency)}` : "Calculated from levels"}</small>
         </article>
+        <article className="insight-card dividend-card">
+          <span>Dividend profile</span>
+          <strong>{marketData ? formatPrice(marketData.quote.averageDividendPayment, marketData.currency) : "--"}</strong>
+          <small>
+            {marketData
+              ? `Avg historical payment | annual ${formatPrice(marketData.quote.dividendRate ?? marketData.quote.trailingAnnualDividendRate, marketData.currency)} | ex ${marketData.quote.exDividendDate ?? "n/a"}`
+              : "Amount and timing from Yahoo"}
+          </small>
+        </article>
       </section>
 
       {marketData && (
@@ -563,6 +583,8 @@ export default function Home() {
           <div className="summary-metrics">
             <span>{formatPrice(marketData.quote.regularMarketPrice, marketData.currency)}</span>
             <span>{formatPercent(marketData.quote.regularMarketChangePercent)} today</span>
+            <span>Dividend yield {formatPercent(marketData.quote.dividendYield ?? marketData.quote.trailingAnnualDividendYield)}</span>
+            <span>{marketData.quote.dividendDate ? `Payment ${marketData.quote.dividendDate}` : marketData.quote.dividendFrequency}</span>
             <span>{marketData.metrics.trend}</span>
           </div>
           <div className="source-links">

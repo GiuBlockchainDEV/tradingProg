@@ -305,6 +305,7 @@ h1 {
 .primary-score { border-color: rgba(0,230,118,0.32); background: linear-gradient(160deg, rgba(0,230,118,0.16), rgba(255,255,255,0.04)); }
 .primary-score strong { color: var(--green); font-size: clamp(2.4rem, 5vw, 4.2rem); }
 .odds-card strong { color: var(--green-2); }
+.dividend-card strong { color: var(--green-2); }
 .risk-card strong { color: var(--amber); }
 
 .market-summary {

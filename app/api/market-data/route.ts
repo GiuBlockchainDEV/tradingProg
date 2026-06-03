@@ -15,6 +15,11 @@ type PricePoint = {
   volume?: number | null;
 };
 
+type DividendEvent = {
+  amount?: number | null;
+  date: Date;
+};
+
 const PREFERRED_TYPES = new Set(["EQUITY", "ETF", "MUTUALFUND", "INDEX"]);
 
 function numeric(value: unknown) {
@@ -23,6 +28,73 @@ function numeric(value: unknown) {
 
 function textValue(value: unknown) {
   return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+function dateValue(value: unknown) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const milliseconds = value > 10_000_000_000 ? value : value * 1000;
+    const date = new Date(milliseconds);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toISOString().slice(0, 10);
+  }
+
+  return null;
+}
+
+function dividendFrequencyLabel(paymentsPerYear: number | null) {
+  if (paymentsPerYear === null || paymentsPerYear <= 0) {
+    return "No regular dividend history detected in Yahoo Finance chart events";
+  }
+
+  if (paymentsPerYear >= 10) return "Monthly based on historical dividend events";
+  if (paymentsPerYear >= 3) return "Quarterly based on historical dividend events";
+  if (paymentsPerYear >= 1.5) return "Semiannual based on historical dividend events";
+  return "Annual based on historical dividend events";
+}
+
+function buildDividendProfile(dividends: DividendEvent[], quote: Record<string, unknown>) {
+  const sortedDividends = dividends
+    .filter((event) => typeof event.amount === "number" && event.amount > 0 && event.date instanceof Date)
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+  const amounts = sortedDividends.map((event) => Number(event.amount));
+  const averagePayment = mean(amounts);
+  const lastDividend = sortedDividends.at(-1);
+  const oneYearAgo = new Date();
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  const trailingTwelveMonthAmount = sortedDividends
+    .filter((event) => event.date >= oneYearAgo)
+    .reduce((total, event) => total + Number(event.amount), 0);
+  const firstDividend = sortedDividends[0];
+  const lastDividendForFrequency = sortedDividends.at(-1);
+  const historyYears = firstDividend && lastDividendForFrequency
+    ? Math.max(1, (lastDividendForFrequency.date.getTime() - firstDividend.date.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+    : null;
+  const paymentsPerYear = historyYears === null ? null : sortedDividends.length / historyYears;
+  const forwardAnnualDividend = numeric(quote.dividendRate);
+  const trailingAnnualDividend = numeric(quote.trailingAnnualDividendRate) ?? (trailingTwelveMonthAmount > 0 ? trailingTwelveMonthAmount : null);
+
+  return {
+    dividendYield: round(dividendPercent(quote.dividendYield), 2),
+    dividendRate: round(forwardAnnualDividend, 4),
+    trailingAnnualDividendRate: round(trailingAnnualDividend, 4),
+    trailingAnnualDividendYield: round(dividendPercent(quote.trailingAnnualDividendYield), 2),
+    averageDividendPayment: round(averagePayment, 4),
+    lastDividendAmount: round(typeof lastDividend?.amount === "number" ? lastDividend.amount : null, 4),
+    lastDividendDate: lastDividend ? dateValue(lastDividend.date) : null,
+    dividendPaymentsPerYear: round(paymentsPerYear, 2),
+    dividendFrequency: dividendFrequencyLabel(paymentsPerYear),
+    exDividendDate: dateValue(quote.exDividendDate),
+    dividendDate: dateValue(quote.dividendDate),
+    dividendHistoryCount: sortedDividends.length,
+  };
 }
 
 function dividendPercent(value: unknown) {
@@ -501,7 +573,15 @@ Key fundamentals:
 - Trailing P/E: ${round(numeric(quote.trailingPE), 2) ?? "n/a"}
 - Forward P/E: ${round(numeric(quote.forwardPE), 2) ?? "n/a"}
 - Trailing EPS: ${round(numeric(quote.epsTrailingTwelveMonths), 2) ?? "n/a"}
-- Dividend yield: ${percent(dividendPercent(quote.dividendYield))}
+- Dividend yield: ${percent(numeric(quote.dividendYield))}
+- Forward annual dividend: ${money(numeric(quote.dividendRate), currency)}
+- Trailing annual dividend: ${money(numeric(quote.trailingAnnualDividendRate), currency)}
+- Average dividend per historical payment: ${money(numeric(quote.averageDividendPayment), currency)}
+- Last dividend paid: ${money(numeric(quote.lastDividendAmount), currency)} on ${quote.lastDividendDate ?? "n/a"}
+- Dividend cadence: ${quote.dividendFrequency ?? "n/a"}
+- Ex-dividend date: ${quote.exDividendDate ?? "n/a"}
+- Payment date: ${quote.dividendDate ?? "n/a"}
+- Dividend history events used: ${quote.dividendHistoryCount ?? "n/a"}
 - Beta: ${round(numeric(quote.beta), 2) ?? "n/a"}
 
 Instructions: use these data points as the base for the report, do not invent missing metrics, keep the investment score and buy/sell/risk levels visible, and recommend verification on TradingView/Yahoo before execution.`;}
@@ -521,11 +601,11 @@ async function getMarketData(query: string) {
 
   const [quoteResult, chartResult] = await Promise.all([
     yahooFinance.quote(symbol),
-    yahooFinance.chart(symbol, { period1, interval: "1d" }),
+    yahooFinance.chart(symbol, { period1, period2: new Date(), interval: "1d", events: "div" }),
   ]);
 
-  const quote = quoteResult as unknown as Record<string, string | number | null | undefined>;
-  const chart = chartResult as unknown as { quotes?: PricePoint[] };
+  const quote = quoteResult as unknown as Record<string, unknown>;
+  const chart = chartResult as unknown as { quotes?: PricePoint[]; events?: { dividends?: DividendEvent[] } };
 
   const pricePoints: PricePoint[] = (chart.quotes ?? [])
     .filter((point) => typeof point.close === "number")
@@ -537,6 +617,8 @@ async function getMarketData(query: string) {
       volume: point.volume,
     }));
 
+  const dividendEvents = chart.events?.dividends ?? [];
+  const dividendProfile = buildDividendProfile(dividendEvents, quote);
   const closes = pricePoints.map((point) => Number(point.close)).filter(Number.isFinite);
   const returns = closes.slice(1).map((close, index) => close / closes[index] - 1).filter(Number.isFinite);
   const lastClose = closes.length > 0 ? closes[closes.length - 1] : null;
@@ -642,7 +724,7 @@ async function getMarketData(query: string) {
       trailingPE: round(numeric(quote.trailingPE), 2),
       forwardPE: round(numeric(quote.forwardPE), 2),
       epsTrailingTwelveMonths: round(numeric(quote.epsTrailingTwelveMonths), 2),
-      dividendYield: round(dividendPercent(quote.dividendYield), 2),
+      ...dividendProfile,
       beta: round(numeric(quote.beta), 2),
       fiftyTwoWeekHigh: round(numeric(quote.fiftyTwoWeekHigh), 2),
       fiftyTwoWeekLow: round(numeric(quote.fiftyTwoWeekLow), 2),
@@ -661,7 +743,7 @@ async function getMarketData(query: string) {
       exchange,
       currency,
       quoteType: textValue(quote.quoteType) || textValue(match.quoteType),
-      quote: quote as unknown as Record<string, unknown>,
+      quote: { ...quote, ...dividendProfile } as Record<string, unknown>,
       metrics,
       tradeLevels: tradeLevels as unknown as Record<string, number | null | string>,
       links,
