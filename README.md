@@ -16,7 +16,7 @@ Apri `http://localhost:3000`.
 ## Variabili d'ambiente
 
 - `GEMINI_API_KEY`: chiave API Google Gemini, richiesta dalla route server `/api/gemini`.
-- `GEMINI_MODEL`: opzionale, default `gemini-1.5-flash`.
+- `GEMINI_MODEL`: opzionale, default `gemini-3.5-flash`.
 
 ## Note prodotto
 
