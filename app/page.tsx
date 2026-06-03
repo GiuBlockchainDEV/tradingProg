@@ -335,6 +335,14 @@ export default function Home() {
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [hasAcceptedDisclaimer, setHasAcceptedDisclaimer] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem("gtl-disclaimer-accepted") === "true",
+  );
+
+  function acceptDisclaimer() {
+    localStorage.setItem("gtl-disclaimer-accepted", "true");
+    setHasAcceptedDisclaimer(true);
+  }
 
   function updateField(field: keyof FormState, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -416,188 +424,173 @@ export default function Home() {
   }
 
   return (
-    <main>
-      <section className="hero">
-        <nav className="topbar" aria-label="Main navigation">
-          <div className="brand-mark">
-            <span className="brand-orb" />
-            <span>Gemini TradeLab</span>
-          </div>
-          <div className="topbar-actions">
-            <span className="status-pill">AI Research</span>
-            <a href="#workspace" className="ghost-link">Open terminal</a>
-          </div>
-        </nav>
-
-        <div className="hero-grid">
-          <div className="hero-copy">
-            <span className="eyebrow">Trading intelligence powered by Gemini</span>
-            <h1>Type a stock, get the full 12-prompt AI investment report.</h1>
+    <main className="app-shell">
+      {!hasAcceptedDisclaimer && (
+        <div className="disclaimer-backdrop" role="dialog" aria-modal="true" aria-labelledby="disclaimer-title">
+          <div className="disclaimer-modal">
+            <div className="modal-icon">!</div>
+            <span className="eyebrow">Before you continue</span>
+            <h2 id="disclaimer-title">Educational research, not financial advice.</h2>
             <p>
-              No prompt setup, no manual metrics. The app fetches market data, scores the stock from 0 to 100,
-              and asks Gemini to blend all 12 research prompts into one integrated report.
+              Gemini TradeLab provides automated market research, scoring, and example trade levels for educational purposes only.
+              It does not provide personalized financial, investment, tax, or legal advice.
             </p>
-            <div className="hero-actions">
-              <a className="primary-cta" href="#workspace">Generate analysis</a>
-              <a className="secondary-cta" href="#modules">View modules</a>
-            </div>
+            <ul>
+              <li>Always verify data, prices, and levels with your broker or market data provider.</li>
+              <li>Markets involve risk, including loss of capital.</li>
+              <li>You are responsible for every investment or trading decision.</li>
+            </ul>
+            <button className="modal-accept" onClick={acceptDisclaimer} type="button">
+              I understand and accept
+            </button>
           </div>
+        </div>
+      )}
 
-          <aside className="market-card" aria-label="Dashboard preview">
-            <div className="market-card-header">
-              <span>Watchlist</span>
-              <strong>Live style</strong>
-            </div>
-            {[
-              ["BTC", "+2.41%", "$68,420"],
-              ["SPY", "+0.34%", "$541.12"],
-              ["EUR/USD", "-0.18%", "1.0832"],
-            ].map(([symbol, change, price]) => (
-              <div className="ticker-row" key={symbol}>
-                <div>
-                  <strong>{symbol}</strong>
-                  <span>AI signal scan</span>
-                </div>
-                <div className={change.startsWith("+") ? "positive" : "negative"}>
-                  <strong>{price}</strong>
-                  <span>{change}</span>
-                </div>
-              </div>
-            ))}
-            <div className="signal-meter">
-              <span>Risk budget used</span>
-              <div><span style={{ width: "42%" }} /></div>
-              <strong>42%</strong>
-            </div>
-          </aside>
-        </div>
-      </section>
+      <header className="app-header">
+        <a className="brand-mark" href="#top" aria-label="Gemini TradeLab home">
+          <span className="brand-orb" />
+          <span>Gemini TradeLab</span>
+        </a>
+        <nav className="header-actions" aria-label="Primary navigation">
+          <a href="#analysis">Analysis</a>
+          <a href="#suite">12 prompts</a>
+          <a href="#report">Report</a>
+        </nav>
+      </header>
 
-      <section className="module-strip" id="modules" aria-label="Key metrics">
-        <div>
-          <strong>12</strong>
-          <span>trading modules</span>
-        </div>
-        <div>
-          <strong>Gemini</strong>
-          <span>server-side API</span>
-        </div>
-        <div>
-          <strong>Markdown</strong>
-          <span>tables and checklists</span>
-        </div>
-        <div>
-          <strong>Responsive</strong>
-          <span>desktop and mobile</span>
-        </div>
-      </section>
-
-      <section className="workspace" id="workspace">
-        <div className="workflow-panel">
-          <div className="section-heading">
-            <span>Research modules</span>
-            <h2>All 12 prompts included</h2>
-          </div>
-
-          <div className="workflow-grid included-workflow-grid">
-            {workflows.map((workflow) => (
-              <article className="workflow-card included" key={workflow.id}>
-                <span className="workflow-number">{workflow.number}</span>
-                <strong>{workflow.title}</strong>
-                <span>{workflow.short}</span>
-                <div>
-                  {workflow.tags.map((tag) => (
-                    <em key={tag}>{tag}</em>
-                  ))}
-                </div>
-              </article>
-            ))}
+      <section className="hero-panel" id="top">
+        <div className="hero-copy">
+          <span className="eyebrow">AI equity research terminal</span>
+          <h1>One stock. One click. Full 12-prompt investment analysis.</h1>
+          <p>
+            Enter a ticker or company name. The app retrieves market data, calculates score, buy zone, sell targets,
+            risk percentage, and sends the complete context to Gemini 2.5 Flash.
+          </p>
+          <div className="trust-row" aria-label="Feature highlights">
+            <span>Yahoo Finance data</span>
+            <span>TradingView verification</span>
+            <span>Objective 0-100 score</span>
+            <span>Buy / Sell / Risk levels</span>
           </div>
         </div>
 
-        <div className="terminal-panel">
-          <div className="terminal-header">
+        <section className="command-card" id="analysis" aria-label="Stock analysis form">
+          <div className="command-card-header">
             <div>
-              <span>Analysis mode</span>
-              <h2>Full research suite</h2>
+              <span className="eyebrow">Start here</span>
+              <h2>Analyze a stock</h2>
             </div>
-            <span className="status-pill">12/12 prompts</span>
+            <span className="status-pill">12/12 prompts included</span>
           </div>
 
-          <form onSubmit={submitAnalysis} className="analysis-form simplified-form">
-            <div className="stock-search-card simple-stock-card">
-              <label>
-                Stock name or ticker
+          <form onSubmit={submitAnalysis} className="stock-command-form">
+            <label>
+              Stock name or ticker
+              <div className="stock-input-shell">
                 <input
                   value={form.market}
                   onChange={(event) => updateField("market", event.target.value)}
-                  placeholder="Example: Apple, Tesla, NVDA, Microsoft"
+                  placeholder="Example: Ferrari, Apple, Tesla, NVDA"
+                  aria-label="Stock name or ticker"
                 />
-              </label>
-              <p>
-                Enter the stock only. The app retrieves market data automatically and runs all 12 prompt types together.
-              </p>
-            </div>
-
-            <div className="selected-prompt-card">
-              <span>Included prompt suite</span>
-              <strong>All 12 research prompts</strong>
-              <p>Gemini will blend strategy generation, backtesting, risk/reward, regime detection, multi-factor logic, optimization, portfolio construction, trade setup, Monte Carlo, drawdown, macro, and alpha/edge analysis.</p>
-            </div>
-
-            {marketData && (
-              <div className="simple-score-card">
-                <div>
-                  <span>Investment Score</span>
-                  <strong>{marketData.metrics.investmentScore}/100</strong>
-                  <small>{marketData.metrics.investmentScoreLabel}</small>
-                </div>
-                <div>
-                  <span>Resolved asset</span>
-                  <strong>{marketData.symbol}</strong>
-                  <small>{formatPrice(marketData.quote.regularMarketPrice, marketData.currency)}</small>
-                </div>
-                <div>
-                  <span>Buy zone</span>
-                  <strong>{formatPrice(marketData.tradeLevels.buyZoneLow, marketData.currency)} - {formatPrice(marketData.tradeLevels.buyZoneHigh, marketData.currency)}</strong>
-                  <small>Preferred: {formatPrice(marketData.tradeLevels.preferredBuy, marketData.currency)}</small>
-                </div>
-                <div>
-                  <span>Sell targets</span>
-                  <strong>{formatPrice(marketData.tradeLevels.target1, marketData.currency)} / {formatPrice(marketData.tradeLevels.target2, marketData.currency)}</strong>
-                  <small>Trim/sell zone</small>
-                </div>
-                <div>
-                  <span>Risk</span>
-                  <strong>{formatPercent(marketData.tradeLevels.riskPercent)}</strong>
-                  <small>Stop: {formatPrice(marketData.tradeLevels.stopLoss, marketData.currency)}</small>
-                </div>
+                <button disabled={isLoading} type="submit">
+                  {isLoading ? "Generating..." : "Generate report"}
+                </button>
               </div>
-            )}
-
-            <button className="submit-button" disabled={isLoading} type="submit">
-              {isLoading ? "Generating report..." : "Generate report"}
-            </button>
+            </label>
           </form>
+
+          <p className="microcopy">
+            No timeframe, capital, risk settings, or manual metrics required. The full research suite runs automatically.
+          </p>
+
+          {error && <div className="error-box compact-error">{error}</div>}
+        </section>
+      </section>
+
+      <section className="insight-grid" aria-label="Live analysis summary">
+        <article className="insight-card primary-score">
+          <span>Investment score</span>
+          <strong>{marketData ? `${marketData.metrics.investmentScore}/100` : "--/100"}</strong>
+          <small>{marketData ? marketData.metrics.investmentScoreLabel : "Generated after analysis"}</small>
+        </article>
+        <article className="insight-card">
+          <span>Buy zone</span>
+          <strong>
+            {marketData
+              ? `${formatPrice(marketData.tradeLevels.buyZoneLow, marketData.currency)} - ${formatPrice(marketData.tradeLevels.buyZoneHigh, marketData.currency)}`
+              : "Waiting for stock"}
+          </strong>
+          <small>{marketData ? `Preferred: ${formatPrice(marketData.tradeLevels.preferredBuy, marketData.currency)}` : "Objective pullback area"}</small>
+        </article>
+        <article className="insight-card">
+          <span>Sell targets</span>
+          <strong>
+            {marketData
+              ? `${formatPrice(marketData.tradeLevels.target1, marketData.currency)} / ${formatPrice(marketData.tradeLevels.target2, marketData.currency)}`
+              : "Waiting for stock"}
+          </strong>
+          <small>Target 1 / Target 2</small>
+        </article>
+        <article className="insight-card risk-card">
+          <span>Risk to stop</span>
+          <strong>{marketData ? formatPercent(marketData.tradeLevels.riskPercent) : "--"}</strong>
+          <small>{marketData ? `Stop: ${formatPrice(marketData.tradeLevels.stopLoss, marketData.currency)}` : "Calculated from levels"}</small>
+        </article>
+      </section>
+
+      {marketData && (
+        <section className="market-summary" aria-label="Resolved market data">
+          <div>
+            <span className="eyebrow">Resolved asset</span>
+            <h2>{marketData.displayName} <small>({marketData.symbol})</small></h2>
+          </div>
+          <div className="summary-metrics">
+            <span>{formatPrice(marketData.quote.regularMarketPrice, marketData.currency)}</span>
+            <span>{formatPercent(marketData.quote.regularMarketChangePercent)} today</span>
+            <span>{marketData.metrics.trend}</span>
+          </div>
+          <div className="source-links">
+            <a href={marketData.links.yahoo} target="_blank" rel="noreferrer">Yahoo Finance</a>
+            <a href={marketData.links.tradingView} target="_blank" rel="noreferrer">TradingView</a>
+          </div>
+        </section>
+      )}
+
+      <section className="suite-section" id="suite">
+        <div className="section-heading centered-heading">
+          <span>Research engine</span>
+          <h2>All 12 prompts are blended into one report</h2>
+          <p>Gemini receives every module together and produces a single coherent decision framework.</p>
+        </div>
+        <div className="suite-grid">
+          {workflows.map((workflow) => (
+            <article className="suite-chip" key={workflow.id}>
+              <span>{workflow.number}</span>
+              <strong>{workflow.title}</strong>
+            </article>
+          ))}
         </div>
       </section>
 
-      <section className="output-section" aria-live="polite">
-        <div className="section-heading">
-          <span>AI output</span>
-          <h2>Operating report</h2>
+      <section className="output-section" id="report" aria-live="polite">
+        <div className="report-header">
+          <div>
+            <span className="eyebrow">AI output</span>
+            <h2>Integrated investment report</h2>
+          </div>
+          <span className="status-pill">Not financial advice</span>
         </div>
 
         {!result && !error && (
           <div className="empty-output">
             <span>Ready</span>
-            <p>Enter a stock and generate one complete report that blends all 12 research prompts with an objective investment score.</p>
+            <p>Enter a stock above to generate score, buy/sell/risk levels, and the full Gemini report.</p>
           </div>
         )}
 
-        {error && <div className="error-box">{error}</div>}
         {result && <MarkdownResult content={result} />}
       </section>
     </main>
-  );
-}
+  );}
