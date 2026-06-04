@@ -106,13 +106,14 @@ Mandatory response format:
 3. Unified decision table with: score drivers, trend/regime, risk/reward, valuation, dividend profile, drawdown risk, macro sensitivity, trade quality, portfolio role, and confidence level.
 4. Mandatory Buy / Sell / Risk table: include suggested buy zone, preferred buy price, stop-loss, risk percentage from buy to stop, current-price downside to stop, target 1, target 2, sell/trim zone, upside percentages, reward/risk, and the objective probability of reaching Target 1 and Target 2, plus the expected timeframe to reach each target if reached. Keep probabilities and timeframes conservative and explicitly avoid optimistic language. If the current price is not attractive, explicitly say to wait for the buy zone instead of buying immediately.
 5. Mandatory Dividend Profile: state average/estimated dividend per payment, annual dividend amount, dividend yield, estimated cadence, ex-dividend date, and payment date when available. If Yahoo does not provide a field, write n/a and say it must be verified with the official company calendar.
-6. Blended strategy plan: entry logic, exit logic, stop/risk rules, position sizing, and invalidation conditions.
-7. Backtest and robustness view: CAGR/Sharpe assumptions, max drawdown, win-rate expectations, Monte Carlo risks, and what data is still needed.
-8. Risk-reduction and return-improvement ideas: include concrete improvements without increasing risk where possible.
-9. Portfolio fit: whether this asset should be a core holding, satellite position, tactical trade, watchlist-only candidate, or avoid.
-10. Market conditions that help or break the thesis.
-11. Final action framework: bullish case, base case, bearish case, and what to monitor next.
-12. Short disclaimer: educational research only, not financial advice.
+6. 3-month forecast: include the base, upper-band, and lower-band 3-month price path from the provided forecast context. Explain it as a volatility-based scenario cone, not a guaranteed prediction.
+7. Blended strategy plan: entry logic, exit logic, stop/risk rules, position sizing, and invalidation conditions.
+8. Backtest and robustness view: CAGR/Sharpe assumptions, max drawdown, win-rate expectations, Monte Carlo risks, and what data is still needed.
+9. Risk-reduction and return-improvement ideas: include concrete improvements without increasing risk where possible.
+10. Portfolio fit: whether this asset should be a core holding, satellite position, tactical trade, watchlist-only candidate, or avoid.
+11. Market conditions that help or break the thesis.
+12. Final action framework: bullish case, base case, bearish case, and what to monitor next.
+13. Short disclaimer: educational research only, not financial advice.
 
 Use clean Markdown with tables where useful. Keep numbers, formulas, and thresholds explicit when reasonable, but flag assumptions and stale or missing data.`;
 }

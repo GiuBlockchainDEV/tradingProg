@@ -97,6 +97,24 @@ type MarketData = {
     rewardRiskTarget2: number | null;
     method: string;
   };
+  forecast: {
+    horizonSessions: number;
+    horizonLabel: string;
+    method: string;
+    baseEnd: number | null;
+    upperEnd: number | null;
+    lowerEnd: number | null;
+    expectedReturnPercent: number | null;
+    upperReturnPercent: number | null;
+    lowerReturnPercent: number | null;
+    points: Array<{
+      session: number;
+      date: string;
+      base: number | null;
+      upper: number | null;
+      lower: number | null;
+    }>;
+  };
   promptContext: string;
 };
 
@@ -348,6 +366,76 @@ function MarkdownResult({ content }: { content: string }) {
         <MarkdownBlock key={`${block.slice(0, 24)}-${index}`} block={block} />
       ))}
     </div>
+  );
+}
+
+function ForecastChart({ marketData }: { marketData: MarketData }) {
+  const points = marketData.forecast.points.filter(
+    (point) => point.base !== null && point.upper !== null && point.lower !== null,
+  );
+
+  if (points.length < 2) {
+    return (
+      <section className="forecast-panel" aria-label="3-month forecast chart">
+        <div className="forecast-header">
+          <div>
+            <span className="eyebrow">3-month forecast</span>
+            <h2>Not enough data for a forecast cone</h2>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const width = 720;
+  const height = 280;
+  const paddingX = 34;
+  const paddingY = 28;
+  const values = points.flatMap((point) => [Number(point.lower), Number(point.base), Number(point.upper)]);
+  const minValue = Math.min(...values) * 0.995;
+  const maxValue = Math.max(...values) * 1.005;
+  const maxSession = Math.max(...points.map((point) => point.session));
+  const x = (session: number) => paddingX + (session / maxSession) * (width - paddingX * 2);
+  const y = (value: number) => height - paddingY - ((value - minValue) / (maxValue - minValue)) * (height - paddingY * 2);
+  const line = (key: "lower" | "base" | "upper") => points
+    .map((point) => `${x(point.session)},${y(Number(point[key]))}`)
+    .join(" ");
+  const area = `${points.map((point) => `${x(point.session)},${y(Number(point.upper))}`).join(" ")} ${[...points]
+    .reverse()
+    .map((point) => `${x(point.session)},${y(Number(point.lower))}`)
+    .join(" ")}`;
+
+  return (
+    <section className="forecast-panel" aria-label="3-month forecast chart">
+      <div className="forecast-header">
+        <div>
+          <span className="eyebrow">3-month forecast</span>
+          <h2>Expected path and volatility cone</h2>
+        </div>
+        <div className="forecast-summary">
+          <span>Base {formatPrice(marketData.forecast.baseEnd, marketData.currency)} ({formatPercent(marketData.forecast.expectedReturnPercent)})</span>
+          <span>Upper {formatPrice(marketData.forecast.upperEnd, marketData.currency)}</span>
+          <span>Lower {formatPrice(marketData.forecast.lowerEnd, marketData.currency)}</span>
+        </div>
+      </div>
+      <div className="forecast-chart-wrap">
+        <svg className="forecast-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Three-month forecast cone chart">
+          <polygon points={area} className="forecast-area" />
+          <polyline points={line("upper")} className="forecast-line upper" />
+          <polyline points={line("base")} className="forecast-line base" />
+          <polyline points={line("lower")} className="forecast-line lower" />
+          {points.map((point) => (
+            <g key={point.session}>
+              <circle cx={x(point.session)} cy={y(Number(point.base))} r="3" className="forecast-dot" />
+              <text x={x(point.session)} y={height - 7} textAnchor="middle" className="forecast-label">
+                {point.session === 0 ? "Now" : `${point.session}d`}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+      <p className="forecast-method">{marketData.forecast.method}</p>
+    </section>
   );
 }
 
@@ -603,6 +691,8 @@ export default function Home() {
           </div>
         </section>
       )}
+
+      {marketData && <ForecastChart marketData={marketData} />}
 
       <section className="suite-section" id="suite">
         <div className="section-heading centered-heading">

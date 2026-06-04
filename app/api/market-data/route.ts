@@ -425,6 +425,85 @@ function estimateTargetProbability(args: {
   };
 }
 
+function addBusinessDays(date: Date, businessDays: number) {
+  const next = new Date(date);
+  let added = 0;
+
+  while (added < businessDays) {
+    next.setDate(next.getDate() + 1);
+    const day = next.getDay();
+    if (day !== 0 && day !== 6) {
+      added += 1;
+    }
+  }
+
+  return next;
+}
+
+function formatDate(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function buildThreeMonthForecast(args: {
+  lastClose: number | null;
+  returns: number[];
+  currency?: string;
+}) {
+  if (args.lastClose === null || args.lastClose <= 0 || args.returns.length < 60) {
+    return {
+      horizonSessions: 63,
+      horizonLabel: "3 months / about 63 trading sessions",
+      method: "Insufficient return history for objective 3-month forecast cone",
+      baseEnd: null,
+      upperEnd: null,
+      lowerEnd: null,
+      expectedReturnPercent: null,
+      upperReturnPercent: null,
+      lowerReturnPercent: null,
+      points: [],
+    };
+  }
+
+  const lastClose = args.lastClose;
+  const recentReturns = args.returns.slice(-252);
+  const averageDailyReturn = mean(recentReturns) ?? 0;
+  const dailyVolatility = standardDeviation(recentReturns) ?? 0;
+  // Shrink drift toward zero to avoid extrapolating an optimistic trend too aggressively.
+  const conservativeDailyDrift = clamp(averageDailyReturn, -0.0015, 0.0015) * 0.5;
+  const horizonSessions = 63;
+  const confidenceMultiplier = 0.67;
+  const sessions = [0, 7, 14, 21, 31, 42, 52, 63];
+  const startDate = new Date();
+  const points = sessions.map((session) => {
+    const base = lastClose * Math.exp(conservativeDailyDrift * session);
+    const cone = confidenceMultiplier * dailyVolatility * Math.sqrt(session);
+    const upper = lastClose * Math.exp(conservativeDailyDrift * session + cone);
+    const lower = lastClose * Math.exp(conservativeDailyDrift * session - cone);
+
+    return {
+      session,
+      date: formatDate(addBusinessDays(startDate, session)),
+      base: round(base, 2),
+      upper: round(upper, 2),
+      lower: round(lower, 2),
+    };
+  });
+  const finalPoint = points[points.length - 1];
+
+  return {
+    horizonSessions,
+    horizonLabel: "3 months / about 63 trading sessions",
+    method: "Conservative forecast cone using recent daily returns, drift shrunk 50% toward zero, and realized volatility bands; educational scenario, not a promise",
+    baseEnd: finalPoint.base,
+    upperEnd: finalPoint.upper,
+    lowerEnd: finalPoint.lower,
+    expectedReturnPercent: finalPoint.base === null ? null : round(((Number(finalPoint.base) / lastClose) - 1) * 100, 2),
+    upperReturnPercent: finalPoint.upper === null ? null : round(((Number(finalPoint.upper) / lastClose) - 1) * 100, 2),
+    lowerReturnPercent: finalPoint.lower === null ? null : round(((Number(finalPoint.lower) / lastClose) - 1) * 100, 2),
+    points,
+  };
+}
+
 function annualizedReturn(closes: number[], firstDate?: Date, lastDate?: Date) {
   if (closes.length < 2 || !firstDate || !lastDate) {
     return null;
@@ -570,9 +649,20 @@ function buildPromptContext(args: {
   quote: Record<string, unknown>;
   metrics: Record<string, number | null | string>;
   tradeLevels: Record<string, number | null | string>;
+  forecast: {
+    horizonLabel: string;
+    method: string;
+    baseEnd: number | null;
+    upperEnd: number | null;
+    lowerEnd: number | null;
+    expectedReturnPercent: number | null;
+    upperReturnPercent: number | null;
+    lowerReturnPercent: number | null;
+    points: Array<{ session: number; date: string; base: number | null; upper: number | null; lower: number | null }>;
+  };
   links: { yahoo: string; tradingView: string };
 }) {
-  const { displayName, symbol, exchange, currency, quoteType, quote, metrics, tradeLevels, links } = args;
+  const { displayName, symbol, exchange, currency, quoteType, quote, metrics, tradeLevels, forecast, links } = args;
 
   return `Market data automatically retrieved from Yahoo Finance for ${displayName} (${symbol}).
 Numerical source: Yahoo Finance quote and 5Y daily chart. Verification links: Yahoo ${links.yahoo}; TradingView ${links.tradingView}.
@@ -604,6 +694,14 @@ Objective buy/sell/risk levels:
 - Target 2 expected timeframe if reached: ${tradeLevels.target2ExpectedTimeframe ?? "n/a"} (median ${round(tradeLevels.target2MedianSessions as number | null, 1) ?? "n/a"} sessions; average ${round(tradeLevels.target2ExpectedSessions as number | null, 1) ?? "n/a"} sessions)
 - Probability method: ${tradeLevels.targetProbabilityMethod}
 - Method: ${tradeLevels.method}
+
+3-month forecast cone:
+- Horizon: ${forecast.horizonLabel}
+- Base case end price: ${money(forecast.baseEnd, currency)} (${percent(forecast.expectedReturnPercent)})
+- Upper volatility band end price: ${money(forecast.upperEnd, currency)} (${percent(forecast.upperReturnPercent)})
+- Lower volatility band end price: ${money(forecast.lowerEnd, currency)} (${percent(forecast.lowerReturnPercent)})
+- Forecast method: ${forecast.method}
+- Forecast points: ${forecast.points.map((point) => `${point.date}: lower ${money(point.lower, currency)}, base ${money(point.base, currency)}, upper ${money(point.upper, currency)}`).join("; ")}
 
 Price and performance:
 - Current price: ${money(numeric(quote.regularMarketPrice), currency)}
@@ -675,6 +773,7 @@ async function getMarketData(query: string) {
   const closes = pricePoints.map((point) => Number(point.close)).filter(Number.isFinite);
   const returns = closes.slice(1).map((close, index) => close / closes[index] - 1).filter(Number.isFinite);
   const lastClose = closes.length > 0 ? closes[closes.length - 1] : null;
+  const forecast = buildThreeMonthForecast({ lastClose, returns, currency: textValue(quote.currency) });
   const sma50 = movingAverage(closes, 50);
   const sma200 = movingAverage(closes, 200);
   const annualizedVolatility = standardDeviation(returns) === null ? null : Number(standardDeviation(returns)) * Math.sqrt(252) * 100;
@@ -791,6 +890,7 @@ async function getMarketData(query: string) {
     },
     metrics,
     tradeLevels,
+    forecast,
     history: pricePoints.slice(-260).map((point) => ({
       date: point.date.toISOString().slice(0, 10),
       close: round(point.close, 2),
@@ -805,6 +905,7 @@ async function getMarketData(query: string) {
       quote: { ...quote, ...dividendProfile } as Record<string, unknown>,
       metrics,
       tradeLevels: tradeLevels as unknown as Record<string, number | null | string>,
+      forecast,
       links,
     }),
   };
