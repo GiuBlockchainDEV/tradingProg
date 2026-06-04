@@ -60,3 +60,7 @@ Dividend fields come from Yahoo Finance when available. The app shows dividend y
 ## Target timeframes
 
 Target timeframes are estimated from historical successful target-before-stop cases. The app reports median and average trading sessions to target and converts the median into an approximate trading-week/month horizon. If there are not enough historical successes, the timeframe is shown as `n/a` rather than forcing a forecast.
+
+## Research dashboard
+
+The UI includes a snowflake-style research radar inspired by visual equity research dashboards. It scores Value, Future, Past Performance, Financial Health, and Dividends from Yahoo Finance valuation, growth, profitability, balance-sheet, analyst, and dividend fields when available. These scores are simplified educational signals and should not be treated as a complete equity model.

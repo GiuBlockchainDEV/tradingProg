@@ -1,7 +1,7 @@
 import YahooFinance from "yahoo-finance2";
 import { NextResponse } from "next/server";
 
-const yahooFinance = new YahooFinance();
+const yahooFinance = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
 
 type MarketDataRequest = {
   query?: string;
@@ -545,6 +545,149 @@ function scoreLabel(score: number) {
   return "High risk";
 }
 
+function averageScores(values: Array<number | null>) {
+  const valid = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  return valid.length === 0 ? null : valid.reduce((total, value) => total + value, 0) / valid.length;
+}
+
+function scoreLowerIsBetter(value: number | null, excellent: number, fair: number, poor: number) {
+  if (value === null || value <= 0) return null;
+  if (value <= excellent) return 90;
+  if (value <= fair) return 70;
+  if (value <= poor) return 45;
+  return 20;
+}
+
+function scoreHigherIsBetter(value: number | null, poor: number, fair: number, excellent: number) {
+  if (value === null || !Number.isFinite(value)) return null;
+  if (value >= excellent) return 90;
+  if (value >= fair) return 70;
+  if (value >= poor) return 45;
+  return 20;
+}
+
+function scoreCurrentRatio(value: number | null) {
+  if (value === null || value <= 0) return null;
+  if (value >= 2) return 90;
+  if (value >= 1.2) return 70;
+  if (value >= 0.9) return 45;
+  return 20;
+}
+
+function scoreDebtToEquity(value: number | null) {
+  if (value === null || value < 0) return null;
+  if (value <= 40) return 90;
+  if (value <= 100) return 70;
+  if (value <= 200) return 45;
+  return 20;
+}
+
+function scoreDividendProfile(args: {
+  dividendYield: number | null;
+  payoutRatio: number | null;
+  historyCount: number | null;
+  trailingAnnualDividendRate: number | null;
+}) {
+  const yieldScore = args.dividendYield === null ? null : scoreHigherIsBetter(args.dividendYield, 0.5, 2, 4);
+  const payoutScore = args.payoutRatio === null
+    ? null
+    : args.payoutRatio <= 0 ? 20
+      : args.payoutRatio <= 0.6 ? 85
+        : args.payoutRatio <= 0.85 ? 60
+          : 30;
+  const historyScore = args.historyCount === null
+    ? null
+    : args.historyCount >= 8 ? 85
+      : args.historyCount >= 4 ? 65
+        : args.historyCount > 0 ? 45
+          : 20;
+  const amountScore = args.trailingAnnualDividendRate === null || args.trailingAnnualDividendRate <= 0 ? 25 : 70;
+
+  return round(averageScores([yieldScore, payoutScore, historyScore, amountScore]), 0);
+}
+
+function buildResearchScores(args: {
+  price: number | null;
+  trailingPE: number | null;
+  forwardPE: number | null;
+  priceToSales: number | null;
+  priceToBook: number | null;
+  pegRatio: number | null;
+  analystTargetMean: number | null;
+  oneYearReturn: number | null;
+  annualizedReturn: number | null;
+  maxDrawdown: number | null;
+  profitMargins: number | null;
+  operatingMargins: number | null;
+  returnOnEquity: number | null;
+  earningsGrowth: number | null;
+  revenueGrowth: number | null;
+  currentRatio: number | null;
+  quickRatio: number | null;
+  debtToEquity: number | null;
+  freeCashflow: number | null;
+  operatingCashflow: number | null;
+  dividendYield: number | null;
+  payoutRatio: number | null;
+  dividendHistoryCount: number | null;
+  trailingAnnualDividendRate: number | null;
+}) {
+  const analystUpside = args.price && args.analystTargetMean ? ((args.analystTargetMean / args.price) - 1) * 100 : null;
+  const value = round(averageScores([
+    scoreLowerIsBetter(args.forwardPE ?? args.trailingPE, 18, 30, 45),
+    scoreLowerIsBetter(args.priceToSales, 3, 8, 14),
+    scoreLowerIsBetter(args.priceToBook, 2.5, 8, 14),
+    scoreLowerIsBetter(args.pegRatio, 1.2, 2.5, 4),
+    analystUpside === null ? null : scoreHigherIsBetter(analystUpside, -10, 5, 25),
+  ]), 0);
+  const future = round(averageScores([
+    scoreHigherIsBetter(args.earningsGrowth === null ? null : args.earningsGrowth * 100, -5, 5, 15),
+    scoreHigherIsBetter(args.revenueGrowth === null ? null : args.revenueGrowth * 100, -2, 4, 12),
+    analystUpside === null ? null : scoreHigherIsBetter(analystUpside, -10, 5, 25),
+  ]), 0);
+  const past = round(averageScores([
+    scoreHigherIsBetter(args.oneYearReturn, -15, 0, 20),
+    scoreHigherIsBetter(args.annualizedReturn, -5, 5, 15),
+    scoreHigherIsBetter(args.profitMargins === null ? null : args.profitMargins * 100, 5, 12, 22),
+    scoreHigherIsBetter(args.operatingMargins === null ? null : args.operatingMargins * 100, 5, 15, 28),
+    scoreHigherIsBetter(args.returnOnEquity === null ? null : args.returnOnEquity * 100, 5, 15, 30),
+    args.maxDrawdown === null ? null : scoreHigherIsBetter(args.maxDrawdown, -55, -35, -20),
+  ]), 0);
+  const health = round(averageScores([
+    scoreCurrentRatio(args.currentRatio),
+    scoreCurrentRatio(args.quickRatio),
+    scoreDebtToEquity(args.debtToEquity),
+    args.freeCashflow === null ? null : args.freeCashflow > 0 ? 80 : 25,
+    args.operatingCashflow === null ? null : args.operatingCashflow > 0 ? 80 : 25,
+  ]), 0);
+  const dividend = scoreDividendProfile({
+    dividendYield: args.dividendYield,
+    payoutRatio: args.payoutRatio,
+    historyCount: args.dividendHistoryCount,
+    trailingAnnualDividendRate: args.trailingAnnualDividendRate,
+  });
+  const overall = round(averageScores([value, future, past, health, dividend]), 0);
+  const checks = [
+    value !== null && value < 45 ? "Valuation screens weak versus available multiples" : null,
+    health !== null && health < 45 ? "Balance-sheet/liquidity checks look weak" : null,
+    dividend !== null && dividend < 45 ? "Dividend profile is limited or low quality" : null,
+    future !== null && future >= 70 ? "Growth/analyst upside screens are constructive" : null,
+    past !== null && past >= 70 ? "Past profitability/performance screens are strong" : null,
+  ].filter((check): check is string => Boolean(check));
+
+  return {
+    overall,
+    value,
+    future,
+    past,
+    health,
+    dividend,
+    analystUpsidePercent: round(analystUpside, 2),
+    method: "Simplified research dashboard scores inspired by equity-analysis dashboards; built from Yahoo valuation, growth, profitability, health, and dividend fields when available",
+    checks,
+  };
+}
+
 function calculateInvestmentScore(args: {
   lastClose: number | null;
   sma50: number | null;
@@ -660,9 +803,11 @@ function buildPromptContext(args: {
     lowerReturnPercent: number | null;
     points: Array<{ session: number; date: string; base: number | null; upper: number | null; lower: number | null }>;
   };
+  fundamentals: Record<string, number | null | string>;
+  researchScores: Record<string, number | null | string | string[]>;
   links: { yahoo: string; tradingView: string };
 }) {
-  const { displayName, symbol, exchange, currency, quoteType, quote, metrics, tradeLevels, forecast, links } = args;
+  const { displayName, symbol, exchange, currency, quoteType, quote, metrics, tradeLevels, forecast, fundamentals, researchScores, links } = args;
 
   return `Market data automatically retrieved from Yahoo Finance for ${displayName} (${symbol}).
 Numerical source: Yahoo Finance quote and 5Y daily chart. Verification links: Yahoo ${links.yahoo}; TradingView ${links.tradingView}.
@@ -679,6 +824,27 @@ Objective investment score:
 - Score: ${metrics.investmentScore}/100
 - Label: ${metrics.investmentScoreLabel}
 - Main drivers: ${metrics.investmentScoreDrivers || "n/a"}
+
+Research dashboard scores:
+- Overall research score: ${researchScores.overall ?? "n/a"}/100
+- Value: ${researchScores.value ?? "n/a"}/100
+- Future growth: ${researchScores.future ?? "n/a"}/100
+- Past performance: ${researchScores.past ?? "n/a"}/100
+- Financial health: ${researchScores.health ?? "n/a"}/100
+- Dividend quality: ${researchScores.dividend ?? "n/a"}/100
+- Research checks: ${Array.isArray(researchScores.checks) ? researchScores.checks.join("; ") : "n/a"}
+- Method: ${researchScores.method ?? "n/a"}
+
+Fundamental snapshot:
+- Sector / industry: ${fundamentals.sector ?? "n/a"} / ${fundamentals.industry ?? "n/a"}
+- Analyst target mean: ${money(fundamentals.analystTargetMean as number | null, currency)} (${percent(fundamentals.analystUpsidePercent as number | null)} upside)
+- Analyst recommendation: ${fundamentals.recommendationKey ?? "n/a"} from ${fundamentals.analystOpinions ?? "n/a"} opinions
+- Profit margin: ${percent(fundamentals.profitMargins as number | null)}
+- ROE: ${percent(fundamentals.returnOnEquity as number | null)}
+- Revenue growth: ${percent(fundamentals.revenueGrowth as number | null)}
+- Earnings growth: ${percent(fundamentals.earningsGrowth as number | null)}
+- Current ratio: ${round(fundamentals.currentRatio as number | null, 2) ?? "n/a"}
+- Debt/equity: ${round(fundamentals.debtToEquity as number | null, 2) ?? "n/a"}
 
 Objective buy/sell/risk levels:
 - Suggested buy zone: ${money(tradeLevels.buyZoneLow as number | null, currency)} - ${money(tradeLevels.buyZoneHigh as number | null, currency)}
@@ -750,13 +916,26 @@ async function getMarketData(query: string) {
   const period1 = new Date();
   period1.setFullYear(period1.getFullYear() - 5);
 
-  const [quoteResult, chartResult] = await Promise.all([
+  const [quoteResult, chartResult, quoteSummaryResult] = await Promise.all([
     yahooFinance.quote(symbol),
     yahooFinance.chart(symbol, { period1, period2: new Date(), interval: "1d", events: "div" }),
+    yahooFinance.quoteSummary(symbol, {
+      modules: ["financialData", "defaultKeyStatistics", "summaryDetail", "assetProfile"],
+    }).catch(() => null),
   ]);
 
   const quote = quoteResult as unknown as Record<string, unknown>;
   const chart = chartResult as unknown as { quotes?: PricePoint[]; events?: { dividends?: DividendEvent[] } };
+  const quoteSummary = quoteSummaryResult as unknown as {
+    financialData?: Record<string, unknown>;
+    defaultKeyStatistics?: Record<string, unknown>;
+    summaryDetail?: Record<string, unknown>;
+    assetProfile?: Record<string, unknown>;
+  } | null;
+  const financialData = quoteSummary?.financialData ?? {};
+  const keyStats = quoteSummary?.defaultKeyStatistics ?? {};
+  const summaryDetail = quoteSummary?.summaryDetail ?? {};
+  const assetProfile = quoteSummary?.assetProfile ?? {};
 
   const pricePoints: PricePoint[] = (chart.quotes ?? [])
     .filter((point) => typeof point.close === "number")
@@ -858,6 +1037,65 @@ async function getMarketData(query: string) {
     investmentScoreLabel: investmentScore.label,
     investmentScoreDrivers: investmentScore.drivers.join(", "),
   };
+  const fundamentals = {
+    sector: textValue(assetProfile.sector) ?? "n/a",
+    industry: textValue(assetProfile.industry) ?? "n/a",
+    businessSummary: textValue(assetProfile.longBusinessSummary) ?? null,
+    analystTargetMean: round(numeric(financialData.targetMeanPrice), 2),
+    analystTargetLow: round(numeric(financialData.targetLowPrice), 2),
+    analystTargetHigh: round(numeric(financialData.targetHighPrice), 2),
+    analystOpinions: numeric(financialData.numberOfAnalystOpinions),
+    recommendationKey: textValue(financialData.recommendationKey) ?? null,
+    recommendationMean: round(numeric(financialData.recommendationMean), 2),
+    currentRatio: round(numeric(financialData.currentRatio), 2),
+    quickRatio: round(numeric(financialData.quickRatio), 2),
+    debtToEquity: round(numeric(financialData.debtToEquity), 2),
+    returnOnEquity: round(numeric(financialData.returnOnEquity) === null ? null : Number(numeric(financialData.returnOnEquity)) * 100, 2),
+    returnOnAssets: round(numeric(financialData.returnOnAssets) === null ? null : Number(numeric(financialData.returnOnAssets)) * 100, 2),
+    profitMargins: round(numeric(financialData.profitMargins) === null ? null : Number(numeric(financialData.profitMargins)) * 100, 2),
+    operatingMargins: round(numeric(financialData.operatingMargins) === null ? null : Number(numeric(financialData.operatingMargins)) * 100, 2),
+    grossMargins: round(numeric(financialData.grossMargins) === null ? null : Number(numeric(financialData.grossMargins)) * 100, 2),
+    revenueGrowth: round(numeric(financialData.revenueGrowth) === null ? null : Number(numeric(financialData.revenueGrowth)) * 100, 2),
+    earningsGrowth: round(numeric(financialData.earningsGrowth) === null ? null : Number(numeric(financialData.earningsGrowth)) * 100, 2),
+    freeCashflow: numeric(financialData.freeCashflow),
+    operatingCashflow: numeric(financialData.operatingCashflow),
+    priceToSales: round(numeric(summaryDetail.priceToSalesTrailing12Months), 2),
+    priceToBook: round(numeric(keyStats.priceToBook), 2),
+    pegRatio: round(numeric(keyStats.pegRatio), 2),
+    payoutRatio: round(numeric(summaryDetail.payoutRatio), 4),
+    shortPercentOfFloat: round(numeric(keyStats.shortPercentOfFloat) === null ? null : Number(numeric(keyStats.shortPercentOfFloat)) * 100, 2),
+  };
+  const analystUpsidePercent = lastClose && fundamentals.analystTargetMean ? ((Number(fundamentals.analystTargetMean) / lastClose) - 1) * 100 : null;
+  const researchScores = buildResearchScores({
+    price: lastClose,
+    trailingPE: numeric(quote.trailingPE) ?? numeric(summaryDetail.trailingPE),
+    forwardPE: numeric(quote.forwardPE) ?? numeric(summaryDetail.forwardPE),
+    priceToSales: fundamentals.priceToSales,
+    priceToBook: fundamentals.priceToBook,
+    pegRatio: fundamentals.pegRatio,
+    analystTargetMean: fundamentals.analystTargetMean,
+    oneYearReturn: baseMetrics.oneYearReturn,
+    annualizedReturn: baseMetrics.annualizedReturn,
+    maxDrawdown: baseMetrics.maxDrawdown,
+    profitMargins: numeric(financialData.profitMargins),
+    operatingMargins: numeric(financialData.operatingMargins),
+    returnOnEquity: numeric(financialData.returnOnEquity),
+    earningsGrowth: numeric(financialData.earningsGrowth),
+    revenueGrowth: numeric(financialData.revenueGrowth),
+    currentRatio: numeric(financialData.currentRatio),
+    quickRatio: numeric(financialData.quickRatio),
+    debtToEquity: numeric(financialData.debtToEquity),
+    freeCashflow: numeric(financialData.freeCashflow),
+    operatingCashflow: numeric(financialData.operatingCashflow),
+    dividendYield: dividendProfile.dividendYield,
+    payoutRatio: numeric(summaryDetail.payoutRatio),
+    dividendHistoryCount: dividendProfile.dividendHistoryCount,
+    trailingAnnualDividendRate: dividendProfile.trailingAnnualDividendRate,
+  });
+  const enrichedFundamentals = {
+    ...fundamentals,
+    analystUpsidePercent: round(analystUpsidePercent, 2),
+  };
 
   const displayName = textValue(quote.longName) || textValue(quote.shortName) || textValue(match.longname) || textValue(match.shortname) || symbol;
   const exchange = textValue(quote.fullExchangeName) || textValue(quote.exchange) || textValue(match.exchDisp);
@@ -875,6 +1113,13 @@ async function getMarketData(query: string) {
     quoteType: textValue(quote.quoteType) || textValue(match.quoteType),
     source: "Yahoo Finance",
     links,
+    companyProfile: {
+      sector: enrichedFundamentals.sector,
+      industry: enrichedFundamentals.industry,
+      businessSummary: enrichedFundamentals.businessSummary,
+    },
+    fundamentals: enrichedFundamentals,
+    researchScores,
     quote: {
       regularMarketPrice: round(numeric(quote.regularMarketPrice), 2),
       regularMarketChangePercent: round(numeric(quote.regularMarketChangePercent), 2),
@@ -906,6 +1151,8 @@ async function getMarketData(query: string) {
       metrics,
       tradeLevels: tradeLevels as unknown as Record<string, number | null | string>,
       forecast,
+      fundamentals: enrichedFundamentals as Record<string, number | null | string>,
+      researchScores: researchScores as Record<string, number | null | string | string[]>,
       links,
     }),
   };

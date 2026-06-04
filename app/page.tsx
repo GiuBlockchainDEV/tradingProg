@@ -30,6 +30,44 @@ type MarketData = {
   exchange?: string;
   currency?: string;
   source: string;
+  companyProfile: {
+    sector: string;
+    industry: string;
+    businessSummary: string | null;
+  };
+  fundamentals: {
+    sector: string;
+    industry: string;
+    analystTargetMean: number | null;
+    analystTargetLow: number | null;
+    analystTargetHigh: number | null;
+    analystUpsidePercent: number | null;
+    analystOpinions: number | null;
+    recommendationKey: string | null;
+    currentRatio: number | null;
+    quickRatio: number | null;
+    debtToEquity: number | null;
+    returnOnEquity: number | null;
+    profitMargins: number | null;
+    revenueGrowth: number | null;
+    earningsGrowth: number | null;
+    priceToSales: number | null;
+    priceToBook: number | null;
+    pegRatio: number | null;
+    payoutRatio: number | null;
+    shortPercentOfFloat: number | null;
+  };
+  researchScores: {
+    overall: number | null;
+    value: number | null;
+    future: number | null;
+    past: number | null;
+    health: number | null;
+    dividend: number | null;
+    analystUpsidePercent: number | null;
+    method: string;
+    checks: string[];
+  };
   links: {
     yahoo: string;
     tradingView: string;
@@ -259,6 +297,17 @@ function formatCompact(value: number | null) {
   }).format(value);
 }
 
+function scoreTone(score: number | null) {
+  if (score === null) return "muted";
+  if (score >= 70) return "good";
+  if (score >= 45) return "mixed";
+  return "weak";
+}
+
+function formatScore(score: number | null) {
+  return score === null ? "n/a" : `${score}/100`;
+}
+
 function parseInline(text: string) {
   const strongPattern = /\*\*(.*?)\*\*/g;
   const parts: ReactNode[] = [];
@@ -366,6 +415,123 @@ function MarkdownResult({ content }: { content: string }) {
         <MarkdownBlock key={`${block.slice(0, 24)}-${index}`} block={block} />
       ))}
     </div>
+  );
+}
+
+function ResearchSnowflake({ marketData }: { marketData: MarketData }) {
+  const axes = [
+    { key: "value", label: "Value", score: marketData.researchScores.value },
+    { key: "future", label: "Future", score: marketData.researchScores.future },
+    { key: "past", label: "Past", score: marketData.researchScores.past },
+    { key: "health", label: "Health", score: marketData.researchScores.health },
+    { key: "dividend", label: "Dividend", score: marketData.researchScores.dividend },
+  ];
+  const center = 120;
+  const maxRadius = 92;
+  const pointFor = (index: number, score: number | null) => {
+    const angle = -Math.PI / 2 + (index / axes.length) * Math.PI * 2;
+    const radius = ((score ?? 0) / 100) * maxRadius;
+    return {
+      x: center + Math.cos(angle) * radius,
+      y: center + Math.sin(angle) * radius,
+    };
+  };
+  const labelFor = (index: number) => {
+    const angle = -Math.PI / 2 + (index / axes.length) * Math.PI * 2;
+    return {
+      x: center + Math.cos(angle) * 113,
+      y: center + Math.sin(angle) * 113,
+    };
+  };
+  const polygon = axes.map((axis, index) => {
+    const point = pointFor(index, axis.score);
+    return `${point.x},${point.y}`;
+  }).join(" ");
+
+  return (
+    <section className="snowflake-section" aria-label="Research snowflake scores">
+      <div className="snowflake-card">
+        <div className="snowflake-copy">
+          <span className="eyebrow">Research snowflake</span>
+          <h2>{formatScore(marketData.researchScores.overall)}</h2>
+          <p>Overall research score built from valuation, growth, past performance, financial health, and dividend quality.</p>
+          {marketData.researchScores.checks.length > 0 && (
+            <ul>
+              {marketData.researchScores.checks.slice(0, 3).map((check) => (
+                <li key={check}>{check}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <svg className="snowflake-chart" viewBox="0 0 240 240" role="img" aria-label="Five-axis research score radar">
+          {[25, 50, 75, 100].map((ring) => {
+            const ringPoints = axes.map((_, index) => {
+              const point = pointFor(index, ring);
+              return `${point.x},${point.y}`;
+            }).join(" ");
+            return <polygon key={ring} points={ringPoints} className="snowflake-ring" />;
+          })}
+          {axes.map((axis, index) => {
+            const outer = pointFor(index, 100);
+            const label = labelFor(index);
+            return (
+              <g key={axis.key}>
+                <line x1={center} y1={center} x2={outer.x} y2={outer.y} className="snowflake-axis" />
+                <text x={label.x} y={label.y} textAnchor="middle" dominantBaseline="middle" className="snowflake-label">
+                  {axis.label}
+                </text>
+              </g>
+            );
+          })}
+          <polygon points={polygon} className="snowflake-score" />
+        </svg>
+      </div>
+      <div className="research-score-grid">
+        {axes.map((axis) => (
+          <article className={`research-score-card ${scoreTone(axis.score)}`} key={axis.key}>
+            <span>{axis.label}</span>
+            <strong>{formatScore(axis.score)}</strong>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FundamentalCards({ marketData }: { marketData: MarketData }) {
+  return (
+    <section className="fundamental-grid" aria-label="Fundamental research cards">
+      <article>
+        <span>Fair value / analysts</span>
+        <strong>{formatPrice(marketData.fundamentals.analystTargetMean, marketData.currency)}</strong>
+        <small>{formatPercent(marketData.fundamentals.analystUpsidePercent)} upside | {marketData.fundamentals.analystOpinions ?? "n/a"} opinions</small>
+      </article>
+      <article>
+        <span>Future growth</span>
+        <strong>{formatPercent(marketData.fundamentals.earningsGrowth)}</strong>
+        <small>earnings | revenue {formatPercent(marketData.fundamentals.revenueGrowth)}</small>
+      </article>
+      <article>
+        <span>Profitability</span>
+        <strong>{formatPercent(marketData.fundamentals.profitMargins)}</strong>
+        <small>ROE {formatPercent(marketData.fundamentals.returnOnEquity)}</small>
+      </article>
+      <article>
+        <span>Financial health</span>
+        <strong>{marketData.fundamentals.currentRatio ?? "n/a"}</strong>
+        <small>current ratio | D/E {marketData.fundamentals.debtToEquity ?? "n/a"}</small>
+      </article>
+      <article>
+        <span>Valuation multiples</span>
+        <strong>P/S {marketData.fundamentals.priceToSales ?? "n/a"}</strong>
+        <small>P/B {marketData.fundamentals.priceToBook ?? "n/a"} | PEG {marketData.fundamentals.pegRatio ?? "n/a"}</small>
+      </article>
+      <article>
+        <span>Business profile</span>
+        <strong>{marketData.companyProfile.sector}</strong>
+        <small>{marketData.companyProfile.industry}</small>
+      </article>
+    </section>
   );
 }
 
@@ -571,16 +737,16 @@ export default function Home() {
 
       <section className="hero-panel" id="top">
         <div className="hero-copy">
-          <span className="eyebrow">AI equity research terminal</span>
+          <span className="eyebrow">Visual equity research terminal</span>
           <h1>One stock. One click. Full 12-prompt investment analysis.</h1>
           <p>
-            Enter a ticker or company name. The app retrieves market data, calculates score, buy zone, sell targets,
-            risk percentage, and sends the complete context to Gemini 2.5 Flash.
+            Enter a ticker or company name. The app builds a visual company report with research scores, fair value checks,
+            fundamentals, forecast cone, buy/sell/risk levels, and Gemini 2.5 Flash analysis.
           </p>
           <div className="trust-row" aria-label="Feature highlights">
             <span>Yahoo Finance data</span>
             <span>TradingView verification</span>
-            <span>Objective 0-100 score</span>
+            <span>Research snowflake</span>
             <span>Buy / Sell / Risk levels</span>
           </div>
         </div>
@@ -691,6 +857,10 @@ export default function Home() {
           </div>
         </section>
       )}
+
+      {marketData && <ResearchSnowflake marketData={marketData} />}
+
+      {marketData && <FundamentalCards marketData={marketData} />}
 
       {marketData && <ForecastChart marketData={marketData} />}
 
