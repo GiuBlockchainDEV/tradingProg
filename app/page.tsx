@@ -138,7 +138,9 @@ type MarketData = {
   forecast: {
     horizonSessions: number;
     horizonLabel: string;
+    source: string;
     method: string;
+    confidenceNote: string;
     baseEnd: number | null;
     upperEnd: number | null;
     lowerEnd: number | null;
@@ -539,13 +541,15 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
   const points = marketData.forecast.points.filter(
     (point) => point.base !== null && point.upper !== null && point.lower !== null,
   );
+  const [selectedIndex, setSelectedIndex] = useState(Math.max(0, points.length - 1));
+  const selectedPoint = points[selectedIndex] ?? points.at(-1);
 
   if (points.length < 2) {
     return (
       <section className="forecast-panel" aria-label="3-month forecast chart">
         <div className="forecast-header">
           <div>
-            <span className="eyebrow">3-month forecast</span>
+            <span className="eyebrow">3-month AI forecast</span>
             <h2>Not enough data for a forecast cone</h2>
           </div>
         </div>
@@ -553,16 +557,18 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
     );
   }
 
-  const width = 720;
-  const height = 280;
-  const paddingX = 34;
-  const paddingY = 28;
+  const width = 760;
+  const height = 320;
+  const paddingLeft = 64;
+  const paddingRight = 24;
+  const paddingTop = 26;
+  const paddingBottom = 42;
   const values = points.flatMap((point) => [Number(point.lower), Number(point.base), Number(point.upper)]);
-  const minValue = Math.min(...values) * 0.995;
-  const maxValue = Math.max(...values) * 1.005;
+  const minValue = Math.min(...values) * 0.992;
+  const maxValue = Math.max(...values) * 1.008;
   const maxSession = Math.max(...points.map((point) => point.session));
-  const x = (session: number) => paddingX + (session / maxSession) * (width - paddingX * 2);
-  const y = (value: number) => height - paddingY - ((value - minValue) / (maxValue - minValue)) * (height - paddingY * 2);
+  const x = (session: number) => paddingLeft + (session / maxSession) * (width - paddingLeft - paddingRight);
+  const y = (value: number) => height - paddingBottom - ((value - minValue) / (maxValue - minValue)) * (height - paddingTop - paddingBottom);
   const line = (key: "lower" | "base" | "upper") => points
     .map((point) => `${x(point.session)},${y(Number(point[key]))}`)
     .join(" ");
@@ -570,12 +576,14 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
     .reverse()
     .map((point) => `${x(point.session)},${y(Number(point.lower))}`)
     .join(" ")}`;
+  const yTicks = Array.from({ length: 5 }, (_, index) => minValue + ((maxValue - minValue) / 4) * index);
+  const xTicks = points.filter((_, index) => index === 0 || index === points.length - 1 || index % 2 === 0);
 
   return (
     <section className="forecast-panel" aria-label="3-month forecast chart">
       <div className="forecast-header">
         <div>
-          <span className="eyebrow">3-month forecast</span>
+          <span className="eyebrow">3-month AI forecast</span>
           <h2>Expected path and volatility cone</h2>
         </div>
         <div className="forecast-summary">
@@ -584,23 +592,64 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
           <span>Lower {formatPrice(marketData.forecast.lowerEnd, marketData.currency)}</span>
         </div>
       </div>
-      <div className="forecast-chart-wrap">
-        <svg className="forecast-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Three-month forecast cone chart">
-          <polygon points={area} className="forecast-area" />
-          <polyline points={line("upper")} className="forecast-line upper" />
-          <polyline points={line("base")} className="forecast-line base" />
-          <polyline points={line("lower")} className="forecast-line lower" />
-          {points.map((point) => (
-            <g key={point.session}>
-              <circle cx={x(point.session)} cy={y(Number(point.base))} r="3" className="forecast-dot" />
-              <text x={x(point.session)} y={height - 7} textAnchor="middle" className="forecast-label">
-                {point.session === 0 ? "Now" : `${point.session}d`}
-              </text>
-            </g>
-          ))}
-        </svg>
+      <div className="forecast-layout">
+        <div className="forecast-chart-wrap">
+          <svg className="forecast-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Three-month forecast cone chart with axes">
+            {yTicks.map((tick) => (
+              <g key={tick}>
+                <line x1={paddingLeft} x2={width - paddingRight} y1={y(tick)} y2={y(tick)} className="forecast-grid-line" />
+                <text x={paddingLeft - 10} y={y(tick)} textAnchor="end" dominantBaseline="middle" className="forecast-axis-label">
+                  {formatPrice(tick, marketData.currency)}
+                </text>
+              </g>
+            ))}
+            {xTicks.map((point) => (
+              <g key={point.session}>
+                <line x1={x(point.session)} x2={x(point.session)} y1={paddingTop} y2={height - paddingBottom} className="forecast-grid-line vertical" />
+                <text x={x(point.session)} y={height - 15} textAnchor="middle" className="forecast-axis-label">
+                  {point.session === 0 ? "Now" : `${point.session}d`}
+                </text>
+              </g>
+            ))}
+            <polygon points={area} className="forecast-area" />
+            <polyline points={line("upper")} className="forecast-line upper" />
+            <polyline points={line("base")} className="forecast-line base" />
+            <polyline points={line("lower")} className="forecast-line lower" />
+            {points.map((point, index) => (
+              <g
+                className={`forecast-point ${index === selectedIndex ? "selected" : ""}`}
+                key={point.session}
+                onClick={() => setSelectedIndex(index)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    setSelectedIndex(index);
+                  }
+                }}
+                aria-label={`Select forecast point for ${point.date}`}
+              >
+                <circle cx={x(point.session)} cy={y(Number(point.upper))} r="4" className="forecast-dot upper-dot" />
+                <circle cx={x(point.session)} cy={y(Number(point.base))} r="5" className="forecast-dot base-dot" />
+                <circle cx={x(point.session)} cy={y(Number(point.lower))} r="4" className="forecast-dot lower-dot" />
+              </g>
+            ))}
+          </svg>
+        </div>
+        {selectedPoint && (
+          <aside className="forecast-detail-card" aria-label="Selected forecast point details">
+            <span>Selected point</span>
+            <strong>{selectedPoint.date}</strong>
+            <dl>
+              <div><dt>Session</dt><dd>{selectedPoint.session}</dd></div>
+              <div><dt>Upper</dt><dd>{formatPrice(selectedPoint.upper, marketData.currency)}</dd></div>
+              <div><dt>Base</dt><dd>{formatPrice(selectedPoint.base, marketData.currency)}</dd></div>
+              <div><dt>Lower</dt><dd>{formatPrice(selectedPoint.lower, marketData.currency)}</dd></div>
+            </dl>
+          </aside>
+        )}
       </div>
-      <p className="forecast-method">{marketData.forecast.method}</p>
+      <p className="forecast-method"><strong>{marketData.forecast.source}</strong>: {marketData.forecast.confidenceNote} {marketData.forecast.method}</p>
     </section>
   );
 }
