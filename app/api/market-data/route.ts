@@ -137,6 +137,68 @@ function compactNumber(value: number | null | undefined) {
   }).format(value);
 }
 
+async function getUsdConversionRate(currency: string | undefined) {
+  const rawCurrency = currency?.trim();
+  const normalized = rawCurrency?.toUpperCase();
+  const isPenceQuote = rawCurrency === "GBp" || normalized === "GBX";
+
+  if (!normalized || normalized === "USD") {
+    return { rate: 1, originalCurrency: normalized || "USD", note: "Already quoted in USD" };
+  }
+
+  const yahooCurrency = isPenceQuote || normalized === "GBP" ? "GBP" : normalized;
+  const penceMultiplier = isPenceQuote ? 0.01 : 1;
+  const directSymbol = `${yahooCurrency}USD=X`;
+  const inverseSymbol = `USD${yahooCurrency}=X`;
+
+  try {
+    const direct = await yahooFinance.quote(directSymbol) as unknown as Record<string, unknown>;
+    const directRate = numeric(direct.regularMarketPrice);
+    if (directRate !== null && directRate > 0) {
+      return {
+        rate: directRate * penceMultiplier,
+        originalCurrency: normalized,
+        note: `Converted using ${directSymbol}`,
+      };
+    }
+  } catch {
+    // Fall through to inverse pair.
+  }
+
+  try {
+    const inverse = await yahooFinance.quote(inverseSymbol) as unknown as Record<string, unknown>;
+    const inverseRate = numeric(inverse.regularMarketPrice);
+    if (inverseRate !== null && inverseRate > 0) {
+      return {
+        rate: (1 / inverseRate) * penceMultiplier,
+        originalCurrency: normalized,
+        note: `Converted using inverse ${inverseSymbol}`,
+      };
+    }
+  } catch {
+    // Fall through to identity fallback.
+  }
+
+  return {
+    rate: 1,
+    originalCurrency: normalized,
+    note: `USD conversion unavailable for ${normalized}; values may already be USD or require manual verification`,
+  };
+}
+
+function convertMoney(value: unknown, rate: number) {
+  const numberValue = numeric(value);
+  return numberValue === null ? value : numberValue * rate;
+}
+
+function convertMoneyFields(record: Record<string, unknown>, fields: string[], rate: number) {
+  for (const field of fields) {
+    if (field in record) {
+      record[field] = convertMoney(record[field], rate);
+    }
+  }
+}
+
 function mean(values: number[]) {
   if (values.length === 0) {
     return null;
@@ -1095,7 +1157,9 @@ Identification:
 - Symbol: ${symbol}
 - Exchange: ${exchange || "n/a"}
 - Type: ${quoteType || "n/a"}
-- Currency: ${currency || "n/a"}
+- Currency: USD
+- Original quote currency: ${quote.originalCurrency ?? "n/a"}
+- USD conversion rate used: ${quote.usdFxRate ?? "n/a"} (${quote.usdConversionNote ?? "n/a"})
 
 Objective investment score:
 - Score: ${metrics.investmentScore}/100
@@ -1221,18 +1285,67 @@ async function getMarketData(query: string) {
   const keyStats = quoteSummary?.defaultKeyStatistics ?? {};
   const summaryDetail = quoteSummary?.summaryDetail ?? {};
   const assetProfile = quoteSummary?.assetProfile ?? {};
+  const originalCurrency = textValue(quote.currency) || textValue(summaryDetail.currency) || textValue(financialData.financialCurrency) || "USD";
+  const usdConversion = await getUsdConversionRate(originalCurrency);
+  const usdFxRate = usdConversion.rate;
+
+  convertMoneyFields(quote, [
+    "regularMarketPrice",
+    "regularMarketChange",
+    "marketCap",
+    "fiftyTwoWeekHigh",
+    "fiftyTwoWeekLow",
+    "epsTrailingTwelveMonths",
+    "dividendRate",
+    "trailingAnnualDividendRate",
+  ], usdFxRate);
+  convertMoneyFields(summaryDetail, [
+    "previousClose",
+    "open",
+    "dayLow",
+    "dayHigh",
+    "regularMarketPreviousClose",
+    "regularMarketOpen",
+    "regularMarketDayLow",
+    "regularMarketDayHigh",
+    "dividendRate",
+    "trailingAnnualDividendRate",
+    "marketCap",
+  ], usdFxRate);
+  convertMoneyFields(financialData, [
+    "currentPrice",
+    "targetHighPrice",
+    "targetLowPrice",
+    "targetMeanPrice",
+    "targetMedianPrice",
+    "totalCash",
+    "totalCashPerShare",
+    "ebitda",
+    "totalDebt",
+    "totalRevenue",
+    "revenuePerShare",
+    "grossProfits",
+    "freeCashflow",
+    "operatingCashflow",
+  ], usdFxRate);
+  quote.currency = "USD";
+  summaryDetail.currency = "USD";
+  financialData.financialCurrency = "USD";
 
   const pricePoints: PricePoint[] = (chart.quotes ?? [])
     .filter((point) => typeof point.close === "number")
     .map((point) => ({
       date: new Date(point.date),
-      close: point.close,
-      high: point.high,
-      low: point.low,
+      close: typeof point.close === "number" ? point.close * usdFxRate : point.close,
+      high: typeof point.high === "number" ? point.high * usdFxRate : point.high,
+      low: typeof point.low === "number" ? point.low * usdFxRate : point.low,
       volume: point.volume,
     }));
 
-  const dividendEvents = chart.events?.dividends ?? [];
+  const dividendEvents = (chart.events?.dividends ?? []).map((event) => ({
+    ...event,
+    amount: typeof event.amount === "number" ? event.amount * usdFxRate : event.amount,
+  }));
   const dividendProfile = buildDividendProfile(dividendEvents, quote);
   const closes = pricePoints.map((point) => Number(point.close)).filter(Number.isFinite);
   const returns = closes.slice(1).map((close, index) => close / closes[index] - 1).filter(Number.isFinite);
@@ -1384,7 +1497,7 @@ async function getMarketData(query: string) {
 
   const displayName = textValue(quote.longName) || textValue(quote.shortName) || textValue(match.longname) || textValue(match.shortname) || symbol;
   const exchange = textValue(quote.fullExchangeName) || textValue(quote.exchange) || textValue(match.exchDisp);
-  const currency = textValue(quote.currency);
+  const currency = "USD";
   const links = {
     yahoo: `https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}`,
     tradingView: `https://www.tradingview.com/symbols/${encodeURIComponent(symbol.replace(".", "-"))}/`,
@@ -1412,6 +1525,9 @@ async function getMarketData(query: string) {
     displayName,
     exchange,
     currency,
+    originalCurrency: usdConversion.originalCurrency,
+    usdFxRate: round(usdFxRate, 8),
+    usdConversionNote: usdConversion.note,
     quoteType: textValue(quote.quoteType) || textValue(match.quoteType),
     source: "Yahoo Finance",
     links,
@@ -1445,7 +1561,7 @@ async function getMarketData(query: string) {
       exchange,
       currency,
       quoteType: textValue(quote.quoteType) || textValue(match.quoteType),
-      quote: { ...quote, ...dividendProfile } as Record<string, unknown>,
+      quote: { ...quote, ...dividendProfile, originalCurrency: usdConversion.originalCurrency, usdFxRate: round(usdFxRate, 8), usdConversionNote: usdConversion.note } as Record<string, unknown>,
       metrics,
       tradeLevels: tradeLevels as unknown as Record<string, number | null | string>,
       forecast,

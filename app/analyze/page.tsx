@@ -30,6 +30,9 @@ type MarketData = {
   displayName: string;
   exchange?: string;
   currency?: string;
+  originalCurrency?: string;
+  usdFxRate?: number | null;
+  usdConversionNote?: string;
   source: string;
   companyProfile: {
     sector: string;
@@ -917,6 +920,7 @@ export default function Home() {
           <div className="summary-metrics">
             <span>{formatPrice(marketData.quote.regularMarketPrice, marketData.currency)}</span>
             <span>{formatPercent(marketData.quote.regularMarketChangePercent)} today</span>
+            <span>{marketData.originalCurrency && marketData.originalCurrency !== "USD" ? `Converted from ${marketData.originalCurrency}` : "USD values"}</span>
             <span>Dividend yield {formatPercent(marketData.quote.dividendYield ?? marketData.quote.trailingAnnualDividendYield)}</span>
             <span>{marketData.quote.dividendDate ? `Payment ${marketData.quote.dividendDate}` : marketData.quote.dividendFrequency}</span>
             <span>{marketData.metrics.trend}</span>

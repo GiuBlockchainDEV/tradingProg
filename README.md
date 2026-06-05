@@ -68,3 +68,7 @@ The UI includes a snowflake-style research radar inspired by visual equity resea
 ## Scenario probabilities
 
 Bullish, normal, and bearish probabilities are estimated with deterministic bootstrap simulations from recent historical returns. The app classifies simulated 3-month final prices into the three scenario zones and displays the resulting percentages in the chart legend and selected-point details.
+
+## USD normalization
+
+All monetary values shown in the UI and passed to the report are normalized to USD. If Yahoo Finance returns a quote in another currency, the backend retrieves a Yahoo FX pair when available, converts price history, quote values, dividends, analyst targets, buy/sell/risk levels, and forecast values to USD, and returns the original currency plus the FX rate used for traceability.
