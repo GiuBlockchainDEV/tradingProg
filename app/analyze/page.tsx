@@ -548,7 +548,6 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
   );
   const [selectedIndex, setSelectedIndex] = useState(Math.max(0, points.length - 1));
   const selectedPoint = points[selectedIndex] ?? points.at(-1);
-  const simulatedPaths = marketData.forecast.simulatedPaths ?? [];
 
   if (points.length < 2) {
     return (
@@ -569,25 +568,14 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
   const paddingRight = 24;
   const paddingTop = 26;
   const paddingBottom = 42;
-  const simulatedValues = simulatedPaths.flatMap((path) => path.points.map((point) => Number(point.price)).filter(Number.isFinite));
-  const values = [
-    ...points.flatMap((point) => [Number(point.lower), Number(point.base), Number(point.upper)]),
-    ...simulatedValues,
-  ];
+  const values = points.flatMap((point) => [Number(point.lower), Number(point.base), Number(point.upper)]);
   const minValue = Math.min(...values) * 0.992;
   const maxValue = Math.max(...values) * 1.008;
-  const maxSession = Math.max(
-    ...points.map((point) => point.session),
-    ...simulatedPaths.flatMap((path) => path.points.map((point) => point.session)),
-  );
+  const maxSession = Math.max(...points.map((point) => point.session));
   const x = (session: number) => paddingLeft + (session / maxSession) * (width - paddingLeft - paddingRight);
   const y = (value: number) => height - paddingBottom - ((value - minValue) / (maxValue - minValue)) * (height - paddingTop - paddingBottom);
   const line = (key: "lower" | "base" | "upper") => points
     .map((point) => `${x(point.session)},${y(Number(point[key]))}`)
-    .join(" ");
-  const simulatedLine = (path: { points: Array<{ session: number; price: number | null }> }) => path.points
-    .filter((point) => point.price !== null)
-    .map((point) => `${x(point.session)},${y(Number(point.price))}`)
     .join(" ");
   const area = `${points.map((point) => `${x(point.session)},${y(Number(point.upper))}`).join(" ")} ${[...points]
     .reverse()
@@ -601,12 +589,12 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
       <div className="forecast-header">
         <div>
           <span className="eyebrow">3-month AI forecast</span>
-          <h2>Expected path and volatility cone</h2>
+          <h2>Three clear scenarios</h2>
         </div>
         <div className="forecast-summary">
-          <span>Base {formatPrice(marketData.forecast.baseEnd, marketData.currency)} ({formatPercent(marketData.forecast.expectedReturnPercent)})</span>
-          <span>Upper {formatPrice(marketData.forecast.upperEnd, marketData.currency)}</span>
-          <span>Lower {formatPrice(marketData.forecast.lowerEnd, marketData.currency)}</span>
+          <span>Normal {formatPrice(marketData.forecast.baseEnd, marketData.currency)} ({formatPercent(marketData.forecast.expectedReturnPercent)})</span>
+          <span>Bullish {formatPrice(marketData.forecast.upperEnd, marketData.currency)}</span>
+          <span>Bearish {formatPrice(marketData.forecast.lowerEnd, marketData.currency)}</span>
         </div>
       </div>
       <div className="forecast-layout">
@@ -629,15 +617,7 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
               </g>
             ))}
             <polygon points={area} className="forecast-area" />
-            {simulatedPaths.map((path, index) => (
-              <polyline
-                className="forecast-simulated-path"
-                key={path.label}
-                points={simulatedLine(path)}
-                style={{ opacity: 0.28 + index * 0.04 }}
-              />
-            ))}
-            <polyline points={line("upper")} className="forecast-line upper" />
+<polyline points={line("upper")} className="forecast-line upper" />
             <polyline points={line("base")} className="forecast-line base" />
             <polyline points={line("lower")} className="forecast-line lower" />
             {points.map((point, index) => (
@@ -661,20 +641,25 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
             ))}
           </svg>
         </div>
+        <div className="scenario-legend" aria-label="Forecast scenario legend">
+          <span><i className="legend-dot bullish" /> Bullish scenario</span>
+          <span><i className="legend-dot normal" /> Normal scenario</span>
+          <span><i className="legend-dot bearish" /> Bearish scenario</span>
+        </div>
         {selectedPoint && (
           <aside className="forecast-detail-card" aria-label="Selected forecast point details">
             <span>Selected point</span>
             <strong>{selectedPoint.date}</strong>
             <dl>
               <div><dt>Session</dt><dd>{selectedPoint.session}</dd></div>
-              <div><dt>Upper</dt><dd>{formatPrice(selectedPoint.upper, marketData.currency)}</dd></div>
-              <div><dt>Base</dt><dd>{formatPrice(selectedPoint.base, marketData.currency)}</dd></div>
-              <div><dt>Lower</dt><dd>{formatPrice(selectedPoint.lower, marketData.currency)}</dd></div>
+              <div><dt>Bullish</dt><dd>{formatPrice(selectedPoint.upper, marketData.currency)}</dd></div>
+              <div><dt>Normal</dt><dd>{formatPrice(selectedPoint.base, marketData.currency)}</dd></div>
+              <div><dt>Bearish</dt><dd>{formatPrice(selectedPoint.lower, marketData.currency)}</dd></div>
             </dl>
           </aside>
         )}
       </div>
-      <p className="forecast-method"><strong>{marketData.forecast.source}</strong>: {marketData.forecast.confidenceNote} {marketData.forecast.method} Thin lines are historical-return bootstrap simulations of possible day-by-day paths.</p>
+      <p className="forecast-method"><strong>{marketData.forecast.source}</strong>: {marketData.forecast.confidenceNote} {marketData.forecast.method} The chart shows only three scenarios: bullish, normal, and bearish.</p>
     </section>
   );
 }

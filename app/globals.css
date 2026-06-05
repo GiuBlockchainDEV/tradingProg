@@ -481,7 +481,7 @@ h1 {
 }
 .forecast-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
+  grid-template-columns: minmax(0, 1fr) 180px 220px;
   gap: 14px;
   align-items: stretch;
 }
@@ -496,7 +496,6 @@ h1 {
 .forecast-grid-line.vertical { stroke-dasharray: 4 6; }
 .forecast-axis-label { fill: var(--muted); font-size: 11px; font-weight: 750; }
 .forecast-area { fill: rgba(69, 108, 245, 0.08); }
-.forecast-simulated-path { fill: none; stroke: #667085; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
 .forecast-line { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .forecast-line.upper { stroke: rgba(18, 183, 106, 0.7); stroke-dasharray: 7 8; }
 .forecast-line.base { stroke: var(--blue); }
@@ -507,6 +506,33 @@ h1 {
 .forecast-dot.upper-dot { fill: var(--green); }
 .forecast-dot.base-dot { fill: var(--blue); }
 .forecast-dot.lower-dot { fill: var(--red); }
+.scenario-legend {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 16px;
+  background: var(--surface-soft);
+}
+.scenario-legend span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+}
+.legend-dot.bullish { background: var(--green); }
+.legend-dot.normal { background: var(--blue); }
+.legend-dot.bearish { background: var(--red); }
+
 .forecast-detail-card {
   border: 1px solid var(--line);
   border-radius: 20px;
