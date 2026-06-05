@@ -445,6 +445,57 @@ function formatDate(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
+function seededRandom(seed: number) {
+  let state = seed >>> 0;
+  return () => {
+    state = (1664525 * state + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
+
+function buildSimulatedPaths(args: {
+  lastClose: number;
+  returns: number[];
+  horizonSessions: number;
+  pathCount?: number;
+}) {
+  const cleanReturns = args.returns
+    .slice(-252)
+    .filter((value) => Number.isFinite(value) && value > -0.8 && value < 0.8)
+    .map((value) => clamp(value, -0.12, 0.12));
+
+  if (cleanReturns.length < 60) {
+    return [];
+  }
+
+  const averageReturn = mean(cleanReturns) ?? 0;
+  const conservativeDrift = clamp(averageReturn, -0.0015, 0.0015) * 0.35;
+  const startDate = new Date();
+  const pathCount = args.pathCount ?? 7;
+
+  return Array.from({ length: pathCount }, (_, pathIndex) => {
+    const random = seededRandom(Math.round(args.lastClose * 100) + pathIndex * 9973 + cleanReturns.length * 7919);
+    let price = args.lastClose;
+    const points = [{ session: 0, date: formatDate(startDate), price: round(price, 2) }];
+
+    for (let session = 1; session <= args.horizonSessions; session += 1) {
+      const sampledReturn = cleanReturns[Math.floor(random() * cleanReturns.length)] ?? 0;
+      const returnShock = sampledReturn - averageReturn + conservativeDrift;
+      price = Math.max(0.01, price * (1 + returnShock));
+      points.push({
+        session,
+        date: formatDate(addBusinessDays(startDate, session)),
+        price: round(price, 2),
+      });
+    }
+
+    return {
+      label: `Sim ${pathIndex + 1}`,
+      points,
+    };
+  });
+}
+
 function buildThreeMonthForecast(args: {
   lastClose: number | null;
   returns: number[];
@@ -464,6 +515,7 @@ function buildThreeMonthForecast(args: {
       upperReturnPercent: null,
       lowerReturnPercent: null,
       points: [],
+      simulatedPaths: [],
     };
   }
 
@@ -477,6 +529,7 @@ function buildThreeMonthForecast(args: {
   const confidenceMultiplier = 0.67;
   const sessions = [0, 7, 14, 21, 31, 42, 52, 63];
   const startDate = new Date();
+  const simulatedPaths = buildSimulatedPaths({ lastClose, returns: args.returns, horizonSessions, pathCount: 7 });
   const points = sessions.map((session) => {
     const base = lastClose * Math.exp(conservativeDailyDrift * session);
     const cone = confidenceMultiplier * dailyVolatility * Math.sqrt(session);
@@ -506,6 +559,7 @@ function buildThreeMonthForecast(args: {
     upperReturnPercent: finalPoint.upper === null ? null : round(((Number(finalPoint.upper) / lastClose) - 1) * 100, 2),
     lowerReturnPercent: finalPoint.lower === null ? null : round(((Number(finalPoint.lower) / lastClose) - 1) * 100, 2),
     points,
+    simulatedPaths,
   };
 }
 
@@ -530,6 +584,10 @@ type ForecastCone = {
   upperReturnPercent: number | null;
   lowerReturnPercent: number | null;
   points: ForecastPoint[];
+  simulatedPaths: Array<{
+    label: string;
+    points: Array<{ session: number; date: string; price: number | null }>;
+  }>;
 };
 
 function extractJsonObject(text: string) {
@@ -914,6 +972,10 @@ function buildPromptContext(args: {
     upperReturnPercent: number | null;
     lowerReturnPercent: number | null;
     points: Array<{ session: number; date: string; base: number | null; upper: number | null; lower: number | null }>;
+    simulatedPaths?: Array<{
+      label: string;
+      points: Array<{ session: number; date: string; price: number | null }>;
+    }>;
   };
   fundamentals: Record<string, number | null | string>;
   researchScores: Record<string, number | null | string | string[]>;
@@ -982,6 +1044,10 @@ Objective buy/sell/risk levels:
 - Forecast method: ${forecast.method}
 - Forecast confidence note: ${forecast.confidenceNote ?? "n/a"}
 - Forecast points: ${forecast.points.map((point) => `${point.date}: lower ${money(point.lower, currency)}, base ${money(point.base, currency)}, upper ${money(point.upper, currency)}`).join("; ")}
+- Simulated realistic paths: ${(forecast.simulatedPaths ?? []).map((path) => {
+  const lastPoint = path.points.at(-1);
+  return `${path.label} final ${money(lastPoint?.price ?? null, currency)}`;
+}).join("; ") || "n/a"}
 
 Price and performance:
 - Current price: ${money(numeric(quote.regularMarketPrice), currency)}

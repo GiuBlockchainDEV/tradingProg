@@ -154,6 +154,10 @@ type MarketData = {
       upper: number | null;
       lower: number | null;
     }>;
+    simulatedPaths: Array<{
+      label: string;
+      points: Array<{ session: number; date: string; price: number | null }>;
+    }>;
   };
   promptContext: string;
 };
@@ -543,6 +547,7 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
   );
   const [selectedIndex, setSelectedIndex] = useState(Math.max(0, points.length - 1));
   const selectedPoint = points[selectedIndex] ?? points.at(-1);
+  const simulatedPaths = marketData.forecast.simulatedPaths ?? [];
 
   if (points.length < 2) {
     return (
@@ -563,14 +568,25 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
   const paddingRight = 24;
   const paddingTop = 26;
   const paddingBottom = 42;
-  const values = points.flatMap((point) => [Number(point.lower), Number(point.base), Number(point.upper)]);
+  const simulatedValues = simulatedPaths.flatMap((path) => path.points.map((point) => Number(point.price)).filter(Number.isFinite));
+  const values = [
+    ...points.flatMap((point) => [Number(point.lower), Number(point.base), Number(point.upper)]),
+    ...simulatedValues,
+  ];
   const minValue = Math.min(...values) * 0.992;
   const maxValue = Math.max(...values) * 1.008;
-  const maxSession = Math.max(...points.map((point) => point.session));
+  const maxSession = Math.max(
+    ...points.map((point) => point.session),
+    ...simulatedPaths.flatMap((path) => path.points.map((point) => point.session)),
+  );
   const x = (session: number) => paddingLeft + (session / maxSession) * (width - paddingLeft - paddingRight);
   const y = (value: number) => height - paddingBottom - ((value - minValue) / (maxValue - minValue)) * (height - paddingTop - paddingBottom);
   const line = (key: "lower" | "base" | "upper") => points
     .map((point) => `${x(point.session)},${y(Number(point[key]))}`)
+    .join(" ");
+  const simulatedLine = (path: { points: Array<{ session: number; price: number | null }> }) => path.points
+    .filter((point) => point.price !== null)
+    .map((point) => `${x(point.session)},${y(Number(point.price))}`)
     .join(" ");
   const area = `${points.map((point) => `${x(point.session)},${y(Number(point.upper))}`).join(" ")} ${[...points]
     .reverse()
@@ -612,6 +628,14 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
               </g>
             ))}
             <polygon points={area} className="forecast-area" />
+            {simulatedPaths.map((path, index) => (
+              <polyline
+                className="forecast-simulated-path"
+                key={path.label}
+                points={simulatedLine(path)}
+                style={{ opacity: 0.28 + index * 0.04 }}
+              />
+            ))}
             <polyline points={line("upper")} className="forecast-line upper" />
             <polyline points={line("base")} className="forecast-line base" />
             <polyline points={line("lower")} className="forecast-line lower" />
@@ -649,7 +673,7 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
           </aside>
         )}
       </div>
-      <p className="forecast-method"><strong>{marketData.forecast.source}</strong>: {marketData.forecast.confidenceNote} {marketData.forecast.method}</p>
+      <p className="forecast-method"><strong>{marketData.forecast.source}</strong>: {marketData.forecast.confidenceNote} {marketData.forecast.method} Thin lines are historical-return bootstrap simulations of possible day-by-day paths.</p>
     </section>
   );
 }
