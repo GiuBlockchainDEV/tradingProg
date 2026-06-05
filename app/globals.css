@@ -523,6 +523,11 @@ h1 {
   font-size: 0.9rem;
   font-weight: 800;
 }
+.scenario-legend b {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
 .legend-dot {
   width: 10px;
   height: 10px;

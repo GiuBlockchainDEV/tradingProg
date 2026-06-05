@@ -148,6 +148,12 @@ type MarketData = {
     expectedReturnPercent: number | null;
     upperReturnPercent: number | null;
     lowerReturnPercent: number | null;
+    scenarioProbabilities: {
+      bullish: number | null;
+      normal: number | null;
+      bearish: number | null;
+      method: string;
+    };
     points: Array<{
       session: number;
       date: string;
@@ -592,9 +598,9 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
           <h2>Three clear scenarios</h2>
         </div>
         <div className="forecast-summary">
-          <span>Normal {formatPrice(marketData.forecast.baseEnd, marketData.currency)} ({formatPercent(marketData.forecast.expectedReturnPercent)})</span>
-          <span>Bullish {formatPrice(marketData.forecast.upperEnd, marketData.currency)}</span>
-          <span>Bearish {formatPrice(marketData.forecast.lowerEnd, marketData.currency)}</span>
+          <span>Bullish {formatPrice(marketData.forecast.upperEnd, marketData.currency)} | {formatPercent(marketData.forecast.scenarioProbabilities.bullish)}</span>
+          <span>Normal {formatPrice(marketData.forecast.baseEnd, marketData.currency)} | {formatPercent(marketData.forecast.scenarioProbabilities.normal)}</span>
+          <span>Bearish {formatPrice(marketData.forecast.lowerEnd, marketData.currency)} | {formatPercent(marketData.forecast.scenarioProbabilities.bearish)}</span>
         </div>
       </div>
       <div className="forecast-layout">
@@ -642,9 +648,9 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
           </svg>
         </div>
         <div className="scenario-legend" aria-label="Forecast scenario legend">
-          <span><i className="legend-dot bullish" /> Bullish scenario</span>
-          <span><i className="legend-dot normal" /> Normal scenario</span>
-          <span><i className="legend-dot bearish" /> Bearish scenario</span>
+          <span><i className="legend-dot bullish" /> Bullish scenario <b>{formatPercent(marketData.forecast.scenarioProbabilities.bullish)}</b></span>
+          <span><i className="legend-dot normal" /> Normal scenario <b>{formatPercent(marketData.forecast.scenarioProbabilities.normal)}</b></span>
+          <span><i className="legend-dot bearish" /> Bearish scenario <b>{formatPercent(marketData.forecast.scenarioProbabilities.bearish)}</b></span>
         </div>
         {selectedPoint && (
           <aside className="forecast-detail-card" aria-label="Selected forecast point details">
@@ -652,14 +658,14 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
             <strong>{selectedPoint.date}</strong>
             <dl>
               <div><dt>Session</dt><dd>{selectedPoint.session}</dd></div>
-              <div><dt>Bullish</dt><dd>{formatPrice(selectedPoint.upper, marketData.currency)}</dd></div>
-              <div><dt>Normal</dt><dd>{formatPrice(selectedPoint.base, marketData.currency)}</dd></div>
-              <div><dt>Bearish</dt><dd>{formatPrice(selectedPoint.lower, marketData.currency)}</dd></div>
+              <div><dt>Bullish ({formatPercent(marketData.forecast.scenarioProbabilities.bullish)})</dt><dd>{formatPrice(selectedPoint.upper, marketData.currency)}</dd></div>
+              <div><dt>Normal ({formatPercent(marketData.forecast.scenarioProbabilities.normal)})</dt><dd>{formatPrice(selectedPoint.base, marketData.currency)}</dd></div>
+              <div><dt>Bearish ({formatPercent(marketData.forecast.scenarioProbabilities.bearish)})</dt><dd>{formatPrice(selectedPoint.lower, marketData.currency)}</dd></div>
             </dl>
           </aside>
         )}
       </div>
-      <p className="forecast-method"><strong>{marketData.forecast.source}</strong>: {marketData.forecast.confidenceNote} {marketData.forecast.method} The chart shows only three scenarios: bullish, normal, and bearish.</p>
+      <p className="forecast-method"><strong>{marketData.forecast.source}</strong>: {marketData.forecast.confidenceNote} {marketData.forecast.method} The chart shows three possible scenario paths. Percentages estimate how often historical-return simulations finish in each scenario zone.</p>
     </section>
   );
 }

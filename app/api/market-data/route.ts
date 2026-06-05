@@ -496,6 +496,67 @@ function buildSimulatedPaths(args: {
   });
 }
 
+function estimateScenarioProbabilities(args: {
+  lastClose: number;
+  returns: number[];
+  bearishEnd: number | null;
+  normalEnd: number | null;
+  bullishEnd: number | null;
+  horizonSessions: number;
+}) {
+  if (
+    args.bearishEnd === null ||
+    args.normalEnd === null ||
+    args.bullishEnd === null ||
+    args.returns.length < 60
+  ) {
+    return {
+      bullish: null,
+      normal: null,
+      bearish: null,
+      method: "Insufficient data for scenario probabilities",
+    };
+  }
+
+  const cleanReturns = args.returns
+    .slice(-252)
+    .filter((value) => Number.isFinite(value) && value > -0.8 && value < 0.8)
+    .map((value) => clamp(value, -0.12, 0.12));
+  const averageReturn = mean(cleanReturns) ?? 0;
+  const conservativeDrift = clamp(averageReturn, -0.0015, 0.0015) * 0.35;
+  const bullishThreshold = (args.normalEnd + args.bullishEnd) / 2;
+  const bearishThreshold = (args.bearishEnd + args.normalEnd) / 2;
+  const random = seededRandom(Math.round(args.lastClose * 100) + cleanReturns.length * 31337);
+  const simulations = 500;
+  let bullish = 0;
+  let normal = 0;
+  let bearish = 0;
+
+  for (let simulation = 0; simulation < simulations; simulation += 1) {
+    let price = args.lastClose;
+
+    for (let session = 1; session <= args.horizonSessions; session += 1) {
+      const sampledReturn = cleanReturns[Math.floor(random() * cleanReturns.length)] ?? 0;
+      price = Math.max(0.01, price * (1 + sampledReturn - averageReturn + conservativeDrift));
+    }
+
+    if (price >= bullishThreshold) {
+      bullish += 1;
+    } else if (price <= bearishThreshold) {
+      bearish += 1;
+    } else {
+      normal += 1;
+    }
+  }
+
+  return {
+    bullish: round((bullish / simulations) * 100, 1),
+    normal: round((normal / simulations) * 100, 1),
+    bearish: round((bearish / simulations) * 100, 1),
+    method: "500 deterministic bootstrap simulations from recent historical returns; final 3-month prices are classified into bullish/normal/bearish zones",
+  };
+}
+
 function buildThreeMonthForecast(args: {
   lastClose: number | null;
   returns: number[];
@@ -514,6 +575,12 @@ function buildThreeMonthForecast(args: {
       expectedReturnPercent: null,
       upperReturnPercent: null,
       lowerReturnPercent: null,
+      scenarioProbabilities: {
+        bullish: null,
+        normal: null,
+        bearish: null,
+        method: "Insufficient return history for scenario probabilities",
+      },
       points: [],
       simulatedPaths: [],
     };
@@ -545,6 +612,14 @@ function buildThreeMonthForecast(args: {
     };
   });
   const finalPoint = points[points.length - 1];
+  const scenarioProbabilities = estimateScenarioProbabilities({
+    lastClose,
+    returns: args.returns,
+    bearishEnd: finalPoint.lower,
+    normalEnd: finalPoint.base,
+    bullishEnd: finalPoint.upper,
+    horizonSessions,
+  });
 
   return {
     horizonSessions,
@@ -558,6 +633,7 @@ function buildThreeMonthForecast(args: {
     expectedReturnPercent: finalPoint.base === null ? null : round(((Number(finalPoint.base) / lastClose) - 1) * 100, 2),
     upperReturnPercent: finalPoint.upper === null ? null : round(((Number(finalPoint.upper) / lastClose) - 1) * 100, 2),
     lowerReturnPercent: finalPoint.lower === null ? null : round(((Number(finalPoint.lower) / lastClose) - 1) * 100, 2),
+    scenarioProbabilities,
     points,
     simulatedPaths,
   };
@@ -583,6 +659,12 @@ type ForecastCone = {
   expectedReturnPercent: number | null;
   upperReturnPercent: number | null;
   lowerReturnPercent: number | null;
+  scenarioProbabilities: {
+    bullish: number | null;
+    normal: number | null;
+    bearish: number | null;
+    method: string;
+  };
   points: ForecastPoint[];
   simulatedPaths: Array<{
     label: string;
@@ -654,6 +736,20 @@ async function generateAiThreeMonthForecast(args: {
 
     const finalPoint = points[points.length - 1];
 
+    const scenarioProbabilities = estimateScenarioProbabilities({
+      lastClose: args.lastClose,
+      returns: args.recentHistory
+        .map((point, index, history) => {
+          const previous = index > 0 ? history[index - 1].close : null;
+          return previous && point.close ? point.close / previous - 1 : null;
+        })
+        .filter((value): value is number => typeof value === "number" && Number.isFinite(value)),
+      bearishEnd: finalPoint.lower,
+      normalEnd: finalPoint.base,
+      bullishEnd: finalPoint.upper,
+      horizonSessions: args.quantitativeForecast.horizonSessions,
+    });
+
     return {
       ...args.quantitativeForecast,
       source: textValue(parsed.source) ?? "AI forecast + historical baseline",
@@ -665,6 +761,7 @@ async function generateAiThreeMonthForecast(args: {
       expectedReturnPercent: finalPoint.base === null ? null : round(((Number(finalPoint.base) / args.lastClose) - 1) * 100, 2),
       upperReturnPercent: finalPoint.upper === null ? null : round(((Number(finalPoint.upper) / args.lastClose) - 1) * 100, 2),
       lowerReturnPercent: finalPoint.lower === null ? null : round(((Number(finalPoint.lower) / args.lastClose) - 1) * 100, 2),
+      scenarioProbabilities,
       points,
     };
   } catch {
@@ -971,6 +1068,12 @@ function buildPromptContext(args: {
     expectedReturnPercent: number | null;
     upperReturnPercent: number | null;
     lowerReturnPercent: number | null;
+    scenarioProbabilities?: {
+      bullish: number | null;
+      normal: number | null;
+      bearish: number | null;
+      method: string;
+    };
     points: Array<{ session: number; date: string; base: number | null; upper: number | null; lower: number | null }>;
     simulatedPaths?: Array<{
       label: string;
@@ -1038,8 +1141,10 @@ Objective buy/sell/risk levels:
 3-month forecast cone:
 - Horizon: ${forecast.horizonLabel}
 - Base case end price: ${money(forecast.baseEnd, currency)} (${percent(forecast.expectedReturnPercent)})
-- Upper volatility band end price: ${money(forecast.upperEnd, currency)} (${percent(forecast.upperReturnPercent)})
-- Lower volatility band end price: ${money(forecast.lowerEnd, currency)} (${percent(forecast.lowerReturnPercent)})
+- Bullish scenario end price: ${money(forecast.upperEnd, currency)} (${percent(forecast.upperReturnPercent)}); probability ${percent(forecast.scenarioProbabilities?.bullish ?? null, 1)}
+- Normal scenario end price: ${money(forecast.baseEnd, currency)} (${percent(forecast.expectedReturnPercent)}); probability ${percent(forecast.scenarioProbabilities?.normal ?? null, 1)}
+- Bearish scenario end price: ${money(forecast.lowerEnd, currency)} (${percent(forecast.lowerReturnPercent)}); probability ${percent(forecast.scenarioProbabilities?.bearish ?? null, 1)}
+- Scenario probability method: ${forecast.scenarioProbabilities?.method ?? "n/a"}
 - Forecast source: ${forecast.source ?? "n/a"}
 - Forecast method: ${forecast.method}
 - Forecast confidence note: ${forecast.confidenceNote ?? "n/a"}

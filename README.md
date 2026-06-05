@@ -64,3 +64,7 @@ Target timeframes are estimated from historical successful target-before-stop ca
 ## Research dashboard
 
 The UI includes a snowflake-style research radar inspired by visual equity research dashboards. It scores Value, Future, Past Performance, Financial Health, and Dividends from Yahoo Finance valuation, growth, profitability, balance-sheet, analyst, and dividend fields when available. These scores are simplified educational signals and should not be treated as a complete equity model.
+
+## Scenario probabilities
+
+Bullish, normal, and bearish probabilities are estimated with deterministic bootstrap simulations from recent historical returns. The app classifies simulated 3-month final prices into the three scenario zones and displays the resulting percentages in the chart legend and selected-point details.
