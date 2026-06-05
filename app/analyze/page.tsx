@@ -738,6 +738,7 @@ export default function Home() {
     setIsLoading(true);
     setError("");
     setResult("");
+    setMarketData(null);
 
     try {
       let enrichedForm = form;
@@ -749,8 +750,6 @@ export default function Home() {
 
         if (dataForPrompt) {
           enrichedForm = mergeMarketDataIntoForm(dataForPrompt, form);
-          setMarketData(dataForPrompt);
-          setForm(enrichedForm);
         }
       }
 
@@ -765,6 +764,10 @@ export default function Home() {
         throw new Error(data.error ?? "Request failed.");
       }
 
+      if (dataForPrompt) {
+        setMarketData(dataForPrompt);
+        setForm(enrichedForm);
+      }
       setResult(data.result);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unexpected error.");
@@ -940,23 +943,18 @@ export default function Home() {
 
       {marketData && <ForecastChart marketData={marketData} />}
 
-      <section className="output-section" id="report" aria-live="polite">
-        <div className="report-header">
-          <div>
-            <span className="eyebrow">AI output</span>
-            <h2>Integrated investment report</h2>
+      {result && (
+        <section className="output-section" id="report" aria-live="polite">
+          <div className="report-header">
+            <div>
+              <span className="eyebrow">AI output</span>
+              <h2>Integrated investment report</h2>
+            </div>
+            <span className="status-pill">Not financial advice</span>
           </div>
-          <span className="status-pill">Not financial advice</span>
-        </div>
 
-        {!result && !error && (
-          <div className="empty-output">
-            <span>Ready</span>
-            <p>Enter a stock above to generate score, buy/sell/risk levels, and the full AI report.</p>
-          </div>
-        )}
-
-        {result && <MarkdownResult content={result} />}
-      </section>
+          <MarkdownResult content={result} />
+        </section>
+      )}
     </main>
   );}
