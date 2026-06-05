@@ -240,6 +240,54 @@ h1 {
 .stock-input-shell button:disabled { opacity: 0.65; cursor: wait; }
 .microcopy { margin: 0; color: var(--muted); line-height: 1.55; font-size: 0.92rem; }
 
+.generate-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+.loading-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.38);
+  border-top-color: #ffffff;
+  border-radius: 999px;
+  animation: spin 0.75s linear infinite;
+}
+.loading-spinner.large {
+  width: 34px;
+  height: 34px;
+  border-width: 3px;
+  border-color: #d0d5dd;
+  border-top-color: var(--blue);
+  flex: 0 0 auto;
+}
+.loading-panel {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 18px;
+  padding: 14px;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+.loading-panel strong {
+  display: block;
+  margin-bottom: 3px;
+  color: #172554;
+}
+.loading-panel p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.45;
+  font-size: 0.92rem;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+
 .insight-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));

@@ -843,8 +843,9 @@ export default function Home() {
                   placeholder="Example: Ferrari, Apple, Tesla, NVDA"
                   aria-label="Stock name or ticker"
                 />
-                <button disabled={isLoading} type="submit">
-                  {isLoading ? "Generating..." : "Generate report"}
+                <button className="generate-button" disabled={isLoading} type="submit">
+                  {isLoading && <span className="loading-spinner" aria-hidden="true" />}
+                  <span>{isLoading ? "Analyzing..." : "Generate report"}</span>
                 </button>
               </div>
             </label>
@@ -853,6 +854,16 @@ export default function Home() {
           <p className="microcopy">
             No timeframe, capital, risk settings, or manual metrics required. The full research suite runs automatically.
           </p>
+
+          {isLoading && (
+            <div className="loading-panel" role="status" aria-live="polite">
+              <span className="loading-spinner large" aria-hidden="true" />
+              <div>
+                <strong>Building your investment report...</strong>
+                <p>Fetching market data, simulating forecast paths, and generating the Gemini analysis.</p>
+              </div>
+            </div>
+          )}
 
           {error && <div className="error-box compact-error">{error}</div>}
         </section>
