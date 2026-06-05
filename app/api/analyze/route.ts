@@ -52,7 +52,7 @@ const workflowCatalog = {
   },
 } as const;
 
-type GeminiRequest = {
+type AiRequest = {
   workflow?: string;
   market?: string;
   timeframe?: string;
@@ -75,7 +75,7 @@ function normalize(value: unknown, fallback = "Not specified") {
   return trimmed.length > 0 ? trimmed : fallback;
 }
 
-function buildPrompt(input: GeminiRequest) {
+function buildPrompt(input: AiRequest) {
   const fullSuiteScope = Object.values(workflowCatalog)
     .map((workflow, index) => `${index + 1}. ${workflow.title}: ${workflow.objective}`)
     .join("\n");
@@ -116,20 +116,20 @@ Mandatory response format:
 13. Final action framework: bullish case, base case, bearish case, and what to monitor next.
 14. Short disclaimer: educational research only, not financial advice.
 
-Use clean Markdown with tables where useful. Keep numbers, formulas, and thresholds explicit when reasonable, but flag assumptions and stale or missing data.`;
+Do not mention the underlying AI provider or model name in the user-facing report. Use clean Markdown with tables where useful. Keep numbers, formulas, and thresholds explicit when reasonable, but flag assumptions and stale or missing data.`;
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.AI_API_KEY || process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
     return NextResponse.json(
-      { error: "GEMINI_API_KEY is not configured. Add it in your environment variables, or copy .env.example to .env.local for local development." },
+      { error: "AI_API_KEY is not configured. Add it in your environment variables, or copy .env.example to .env.local for local development." },
       { status: 500 },
     );
   }
 
-  let body: GeminiRequest;
+  let body: AiRequest;
 
   try {
     body = await request.json();
@@ -140,7 +140,7 @@ export async function POST(request: Request) {
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-      model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+      model: process.env.AI_MODEL || process.env.GEMINI_MODEL || "gemini-2.5-flash",
     });
 
     const result = await model.generateContent(buildPrompt(body));
@@ -151,10 +151,10 @@ export async function POST(request: Request) {
       result: text,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error while generating the Gemini response.";
+    const message = error instanceof Error ? error.message : "Unknown error while generating the AI response.";
 
     return NextResponse.json(
-      { error: `Gemini did not complete the request: ${message}` },
+      { error: `The AI engine did not complete the request: ${message}` },
       { status: 502 },
     );
   }

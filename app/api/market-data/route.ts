@@ -597,7 +597,7 @@ function extractJsonObject(text: string) {
   const end = candidate.lastIndexOf("}");
 
   if (start === -1 || end === -1 || end <= start) {
-    throw new Error("Gemini forecast did not return JSON.");
+    throw new Error("AI forecast did not return JSON.");
   }
 
   return JSON.parse(candidate.slice(start, end + 1));
@@ -631,7 +631,7 @@ async function generateAiThreeMonthForecast(args: {
   maxDrawdown: number | null;
   trend: string;
 }) {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.AI_API_KEY || process.env.GEMINI_API_KEY;
 
   if (!apiKey || args.lastClose === null || args.quantitativeForecast.points.length < 2) {
     return args.quantitativeForecast;
@@ -640,9 +640,9 @@ async function generateAiThreeMonthForecast(args: {
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-      model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+      model: process.env.AI_MODEL || process.env.GEMINI_MODEL || "gemini-2.5-flash",
     });
-    const prompt = `Generate a conservative 3-month price forecast cone as strict JSON only.\n\nRules:\n- Use the historical prices, volatility and quantitative baseline below.\n- Do not be optimistic. Treat this as a scenario cone, not a promise.\n- Preserve the same sessions and date count as the baseline.\n- Output only valid JSON. No markdown.\n- JSON shape: {"source":"Gemini 2.5 Flash + historical baseline","confidenceNote":"...","method":"...","points":[{"session":0,"date":"YYYY-MM-DD","lower":number,"base":number,"upper":number}]}\n- For each point enforce lower <= base <= upper.\n\nAsset: ${args.displayName} (${args.symbol})\nCurrency: ${args.currency ?? "n/a"}\nLast close: ${args.lastClose}\nTrend: ${args.trend}\n1Y return: ${args.oneYearReturn ?? "n/a"}%\nAnnualized volatility: ${args.annualizedVolatility ?? "n/a"}%\nMax drawdown: ${args.maxDrawdown ?? "n/a"}%\nRecent history sample: ${JSON.stringify(args.recentHistory.slice(-90))}\nQuantitative baseline: ${JSON.stringify(args.quantitativeForecast.points)}`;
+    const prompt = `Generate a conservative 3-month price forecast cone as strict JSON only.\n\nRules:\n- Use the historical prices, volatility and quantitative baseline below.\n- Do not be optimistic. Treat this as a scenario cone, not a promise.\n- Preserve the same sessions and date count as the baseline.\n- Output only valid JSON. No markdown.\n- JSON shape: {"source":"AI forecast + historical baseline","confidenceNote":"...","method":"...","points":[{"session":0,"date":"YYYY-MM-DD","lower":number,"base":number,"upper":number}]}\n- For each point enforce lower <= base <= upper.\n\nAsset: ${args.displayName} (${args.symbol})\nCurrency: ${args.currency ?? "n/a"}\nLast close: ${args.lastClose}\nTrend: ${args.trend}\n1Y return: ${args.oneYearReturn ?? "n/a"}%\nAnnualized volatility: ${args.annualizedVolatility ?? "n/a"}%\nMax drawdown: ${args.maxDrawdown ?? "n/a"}%\nRecent history sample: ${JSON.stringify(args.recentHistory.slice(-90))}\nQuantitative baseline: ${JSON.stringify(args.quantitativeForecast.points)}`;
     const result = await model.generateContent(prompt);
     const parsed = extractJsonObject(result.response.text()) as Record<string, unknown>;
     const aiPointsInput = Array.isArray(parsed.points) ? parsed.points : [];
@@ -656,7 +656,7 @@ async function generateAiThreeMonthForecast(args: {
 
     return {
       ...args.quantitativeForecast,
-      source: textValue(parsed.source) ?? "Gemini 2.5 Flash + historical baseline",
+      source: textValue(parsed.source) ?? "AI forecast + historical baseline",
       method: textValue(parsed.method) ?? "AI-generated conservative 3-month scenario cone using historical data and quantitative baseline",
       confidenceNote: textValue(parsed.confidenceNote) ?? "AI scenario generated from past data; not a guaranteed prediction.",
       baseEnd: finalPoint.base,

@@ -1,7 +1,7 @@
 {
-  "name": "gemini-trading-suite",
+  "name": "equity-research-lab",
   "version": "0.1.0",
-  "description": "Next.js AI trading research suite powered by Google Gemini.",
+  "description": "Next.js AI equity research dashboard with automated market data.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -14,7 +14,6 @@
   },
   "keywords": [
     "nextjs",
-    "gemini",
     "trading",
     "finance",
     "ai"

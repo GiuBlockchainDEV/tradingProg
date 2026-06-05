@@ -753,7 +753,7 @@ export default function Home() {
         }
       }
 
-      const response = await fetch("/api/gemini", {
+      const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(enrichedForm),
@@ -781,7 +781,7 @@ export default function Home() {
             <span className="eyebrow">Before you continue</span>
             <h2 id="disclaimer-title">Educational research, not financial advice.</h2>
             <p>
-              Gemini TradeLab provides automated market research, scoring, and example trade levels for educational purposes only.
+              Equity Research Lab provides automated market research, scoring, and example trade levels for educational purposes only.
               It does not provide personalized financial, investment, tax, or legal advice.
             </p>
             <ul>
@@ -797,9 +797,9 @@ export default function Home() {
       )}
 
       <header className="app-header">
-        <a className="brand-mark" href="#top" aria-label="Gemini TradeLab home">
+        <a className="brand-mark" href="#top" aria-label="Equity Research Lab home">
           <span className="brand-orb" />
-          <span>Gemini TradeLab</span>
+          <span>Equity Research Lab</span>
         </a>
         <nav className="header-actions" aria-label="Primary navigation">
           <a href="#analysis">Analysis</a>
@@ -814,7 +814,7 @@ export default function Home() {
           <h1>One stock. One click. Full 12-prompt investment analysis.</h1>
           <p>
             Enter a ticker or company name. The app builds a visual company report with research scores, fair value checks,
-            fundamentals, forecast cone, buy/sell/risk levels, and Gemini 2.5 Flash analysis.
+            fundamentals, forecast cone, buy/sell/risk levels, and a full AI research report.
           </p>
           <div className="trust-row" aria-label="Feature highlights">
             <span>Yahoo Finance data</span>
@@ -860,7 +860,7 @@ export default function Home() {
               <span className="loading-spinner large" aria-hidden="true" />
               <div>
                 <strong>Building your investment report...</strong>
-                <p>Fetching market data, simulating forecast paths, and generating the Gemini analysis.</p>
+                <p>Fetching market data, simulating forecast paths, and generating the AI analysis.</p>
               </div>
             </div>
           )}
@@ -952,7 +952,7 @@ export default function Home() {
         <div className="section-heading centered-heading">
           <span>Research engine</span>
           <h2>All 12 prompts are blended into one report</h2>
-          <p>Gemini receives every module together and produces a single coherent decision framework.</p>
+          <p>The AI engine receives every module together and produces a single coherent decision framework.</p>
         </div>
         <div className="suite-grid">
           {workflows.map((workflow) => (
@@ -976,7 +976,7 @@ export default function Home() {
         {!result && !error && (
           <div className="empty-output">
             <span>Ready</span>
-            <p>Enter a stock above to generate score, buy/sell/risk levels, and the full Gemini report.</p>
+            <p>Enter a stock above to generate score, buy/sell/risk levels, and the full AI report.</p>
           </div>
         )}
 

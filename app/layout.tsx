@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Gemini Trading Suite",
-  description: "AI trading research workspace powered by Google Gemini.",
+  title: "Equity Research Lab",
+  description: "AI equity research workspace with automated market data and visual analysis.",
   icons: {
     icon: "/favicon.ico",
   },
