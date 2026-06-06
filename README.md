@@ -76,3 +76,7 @@ All monetary values shown in the UI and passed to the report are normalized to U
 ## Prompt quality
 
 The analysis prompt is optimized for objective, reality-based output. It weighs company fundamentals, valuation and analyst consensus, financial health, trend analytics, quantitative risk models, dividends, target probabilities/timeframes, 3-month forecast scenarios, and macro/geopolitical sensitivity. Missing or stale data must be flagged rather than invented, and analyst targets are treated as one input rather than truth.
+
+## Advanced intelligence modules
+
+The API now returns an Alpha Score built from three pillars: technical model, fundamental model, and sentiment/attention proxy. It also returns mathematical pattern recognition, an on-demand strategy lab/backtest over simple indicator strategies, calendar-month seasonality, and connector status for external alternative data sources such as social sentiment, business footprint, insider trading, politician trading, COT, and macro overlays. External feeds require dedicated APIs or data vendors before they can become live data modules.

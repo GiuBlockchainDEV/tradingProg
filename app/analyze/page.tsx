@@ -139,6 +139,36 @@ type MarketData = {
     rewardRiskTarget2: number | null;
     method: string;
   };
+  advancedIntelligence: {
+    alphaScore: {
+      score: number | null;
+      label: string;
+      technicalScore: number | null;
+      fundamentalScore: number | null;
+      sentimentScore: number | null;
+      method: string;
+    };
+    patternRecognition: {
+      support: number | null;
+      resistance: number | null;
+      regressionSlopePercentPerSession: number | null;
+      channelWidthPercent: number | null;
+      patterns: Array<{ name: string; signal: string; confidence: number; details: string }>;
+      method: string;
+    };
+    strategyLab: {
+      bestStrategy: string;
+      strategies: Array<{ name: string; signal: string; totalReturn: number | null; annualizedReturn: number | null; maxDrawdown: number | null; winRate: number | null }>;
+      method: string;
+    };
+    seasonality: {
+      bestMonth: string;
+      worstMonth: string;
+      monthly: Array<{ month: string; averageReturn: number | null; winRate: number | null; samples: number }>;
+      method: string;
+    };
+    dataConnectors: Array<{ name: string; status: string; detail: string }>;
+  };
   forecast: {
     horizonSessions: number;
     horizonLabel: string;
@@ -556,6 +586,66 @@ function FundamentalCards({ marketData }: { marketData: MarketData }) {
   );
 }
 
+function AdvancedIntelligenceCards({ marketData }: { marketData: MarketData }) {
+  const alpha = marketData.advancedIntelligence.alphaScore;
+  const patterns = marketData.advancedIntelligence.patternRecognition.patterns.slice(0, 3);
+  const bestStrategy = marketData.advancedIntelligence.strategyLab.strategies[0];
+  const seasonality = marketData.advancedIntelligence.seasonality;
+  const connectorReady = marketData.advancedIntelligence.dataConnectors.filter((connector) => connector.status !== "connector-required").length;
+
+  return (
+    <section className="advanced-grid" aria-label="Advanced intelligence modules">
+      <article className="advanced-card alpha-card">
+        <span>Alpha scoring system</span>
+        <strong>{formatScore(alpha.score)}</strong>
+        <small>{alpha.label}</small>
+        <div className="mini-score-row">
+          <em>Technical {formatScore(alpha.technicalScore)}</em>
+          <em>Fundamental {formatScore(alpha.fundamentalScore)}</em>
+          <em>Sentiment proxy {formatScore(alpha.sentimentScore)}</em>
+        </div>
+      </article>
+      <article className="advanced-card">
+        <span>Pattern recognition</span>
+        <strong>{patterns[0]?.name ?? "n/a"}</strong>
+        <small>{patterns[0]?.details ?? "No strong pattern detected"}</small>
+        <ul>
+          {patterns.map((pattern) => (
+            <li key={pattern.name}>{pattern.signal} - {pattern.confidence}% confidence</li>
+          ))}
+        </ul>
+      </article>
+      <article className="advanced-card">
+        <span>Strategy lab</span>
+        <strong>{bestStrategy?.name ?? "n/a"}</strong>
+        <small>{bestStrategy ? `${bestStrategy.signal} | annualized ${formatPercent(bestStrategy.annualizedReturn)}` : "No strategy result"}</small>
+        <ul>
+          {marketData.advancedIntelligence.strategyLab.strategies.slice(0, 3).map((strategy) => (
+            <li key={strategy.name}>{strategy.name}: {formatPercent(strategy.winRate)} win rate</li>
+          ))}
+        </ul>
+      </article>
+      <article className="advanced-card">
+        <span>Seasonality</span>
+        <strong>Best {seasonality.bestMonth}</strong>
+        <small>Worst {seasonality.worstMonth}</small>
+        <div className="seasonality-strip">
+          {seasonality.monthly.map((month) => (
+            <i className={Number(month.averageReturn ?? 0) >= 0 ? "positive-month" : "negative-month"} key={month.month} title={`${month.month}: ${formatPercent(month.averageReturn)}`}>
+              {month.month}
+            </i>
+          ))}
+        </div>
+      </article>
+      <article className="advanced-card connectors-card">
+        <span>Alternative data connectors</span>
+        <strong>{connectorReady}/{marketData.advancedIntelligence.dataConnectors.length} live</strong>
+        <small>External feeds required for social, jobs, insider, politician, COT and macro overlays.</small>
+      </article>
+    </section>
+  );
+}
+
 function ForecastChart({ marketData }: { marketData: MarketData }) {
   const fallbackScenarioPaths = [
     {
@@ -964,6 +1054,8 @@ export default function Home() {
       {marketData && <ResearchSnowflake marketData={marketData} />}
 
       {marketData && <FundamentalCards marketData={marketData} />}
+
+      {marketData && <AdvancedIntelligenceCards marketData={marketData} />}
 
       {marketData && <ForecastChart marketData={marketData} />}
 

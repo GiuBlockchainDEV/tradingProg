@@ -223,6 +223,78 @@ button { border: 0; }
 .market-summary,
 .snowflake-card,
 .fundamental-grid article,
+
+.advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.advanced-card {
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  min-height: 170px;
+}
+.advanced-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.advanced-card strong {
+  display: block;
+  margin: 9px 0 7px;
+  color: var(--text);
+  font-size: 1.3rem;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+}
+.alpha-card strong { color: var(--green); font-size: 2rem; }
+.advanced-card small,
+.advanced-card li {
+  color: var(--muted);
+  line-height: 1.45;
+}
+.advanced-card ul {
+  margin: 10px 0 0;
+  padding-left: 16px;
+}
+.mini-score-row {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+.mini-score-row em {
+  border-radius: 999px;
+  padding: 6px 8px;
+  color: #344054;
+  background: var(--surface-soft);
+  font-size: 0.76rem;
+  font-style: normal;
+  font-weight: 800;
+}
+.seasonality-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 12px;
+}
+.seasonality-strip i {
+  border-radius: 7px;
+  padding: 5px 6px;
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 850;
+}
+.positive-month { color: #067647; background: var(--green-soft); }
+.negative-month { color: #991b1b; background: #fee2e2; }
+.connectors-card strong { color: var(--amber); }
+
 .forecast-panel,
 .suite-section,
 .output-section {
@@ -465,6 +537,78 @@ h1 {
 .fundamental-grid article { min-height: 122px; padding: 16px; box-shadow: none; }
 .fundamental-grid small { display: block; margin-top: 7px; color: var(--muted); line-height: 1.45; }
 
+
+.advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.advanced-card {
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  min-height: 170px;
+}
+.advanced-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.advanced-card strong {
+  display: block;
+  margin: 9px 0 7px;
+  color: var(--text);
+  font-size: 1.3rem;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+}
+.alpha-card strong { color: var(--green); font-size: 2rem; }
+.advanced-card small,
+.advanced-card li {
+  color: var(--muted);
+  line-height: 1.45;
+}
+.advanced-card ul {
+  margin: 10px 0 0;
+  padding-left: 16px;
+}
+.mini-score-row {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+.mini-score-row em {
+  border-radius: 999px;
+  padding: 6px 8px;
+  color: #344054;
+  background: var(--surface-soft);
+  font-size: 0.76rem;
+  font-style: normal;
+  font-weight: 800;
+}
+.seasonality-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 12px;
+}
+.seasonality-strip i {
+  border-radius: 7px;
+  padding: 5px 6px;
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 850;
+}
+.positive-month { color: #067647; background: var(--green-soft); }
+.negative-month { color: #991b1b; background: #fee2e2; }
+.connectors-card strong { color: var(--amber); }
+
 .forecast-panel,
 .suite-section,
 .output-section { margin-top: 16px; padding: 22px; }
@@ -681,7 +825,79 @@ tr:last-child td { border-bottom: 0; }
   .command-card,
   .market-summary,
   .snowflake-card,
-  .forecast-panel,
+  
+.advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.advanced-card {
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  min-height: 170px;
+}
+.advanced-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.advanced-card strong {
+  display: block;
+  margin: 9px 0 7px;
+  color: var(--text);
+  font-size: 1.3rem;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+}
+.alpha-card strong { color: var(--green); font-size: 2rem; }
+.advanced-card small,
+.advanced-card li {
+  color: var(--muted);
+  line-height: 1.45;
+}
+.advanced-card ul {
+  margin: 10px 0 0;
+  padding-left: 16px;
+}
+.mini-score-row {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+.mini-score-row em {
+  border-radius: 999px;
+  padding: 6px 8px;
+  color: #344054;
+  background: var(--surface-soft);
+  font-size: 0.76rem;
+  font-style: normal;
+  font-weight: 800;
+}
+.seasonality-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 12px;
+}
+.seasonality-strip i {
+  border-radius: 7px;
+  padding: 5px 6px;
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 850;
+}
+.positive-month { color: #067647; background: var(--green-soft); }
+.negative-month { color: #991b1b; background: #fee2e2; }
+.connectors-card strong { color: var(--amber); }
+
+.forecast-panel,
   .suite-section,
   .output-section { border-radius: 22px; padding: 18px; }
   h1 { font-size: clamp(2.5rem, 14vw, 4rem); }

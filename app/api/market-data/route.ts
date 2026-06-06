@@ -1164,6 +1164,265 @@ function calculateInvestmentScore(args: {
   };
 }
 
+
+function linearRegressionSlope(values: number[]) {
+  if (values.length < 2) return null;
+  const n = values.length;
+  const xMean = (n - 1) / 2;
+  const yMean = mean(values);
+  if (yMean === null || yMean === 0) return null;
+  let numerator = 0;
+  let denominator = 0;
+  values.forEach((value, index) => {
+    numerator += (index - xMean) * (value - yMean);
+    denominator += (index - xMean) ** 2;
+  });
+  return denominator === 0 ? null : (numerator / denominator) / yMean * 100;
+}
+
+function scoreTechnicalModel(args: {
+  lastClose: number | null;
+  sma50: number | null;
+  sma200: number | null;
+  rsi14: number | null;
+  annualizedVolatility: number | null;
+  maxDrawdown: number | null;
+  distanceFrom52WeekHigh: number | null;
+}) {
+  const trendScore = args.lastClose !== null && args.sma50 !== null && args.sma200 !== null
+    ? args.lastClose > args.sma50 && args.sma50 > args.sma200 ? 85
+      : args.lastClose < args.sma50 && args.sma50 < args.sma200 ? 25
+        : 50
+    : null;
+  const rsiScore = args.rsi14 === null ? null
+    : args.rsi14 >= 45 && args.rsi14 <= 65 ? 80
+      : args.rsi14 >= 35 && args.rsi14 <= 75 ? 60
+        : 35;
+  const volatilityScore = args.annualizedVolatility === null ? null
+    : args.annualizedVolatility < 20 ? 80
+      : args.annualizedVolatility < 35 ? 65
+        : args.annualizedVolatility < 55 ? 40
+          : 25;
+  const drawdownScore = args.maxDrawdown === null ? null
+    : args.maxDrawdown > -20 ? 80
+      : args.maxDrawdown > -35 ? 60
+        : args.maxDrawdown > -55 ? 35
+          : 20;
+  const highScore = args.distanceFrom52WeekHigh === null ? null
+    : args.distanceFrom52WeekHigh > -10 ? 70
+      : args.distanceFrom52WeekHigh > -30 ? 50
+        : 30;
+  return round(averageScores([trendScore, rsiScore, volatilityScore, drawdownScore, highScore]), 0);
+}
+
+function scoreSentimentProxy(args: {
+  recommendationMean: number | null;
+  analystUpsidePercent: number | null;
+  analystOpinions: number | null;
+  shortPercentOfFloat: number | null;
+  volumeRatio: number | null;
+}) {
+  const recScore = args.recommendationMean === null ? null
+    : args.recommendationMean <= 1.8 ? 85
+      : args.recommendationMean <= 2.6 ? 70
+        : args.recommendationMean <= 3.4 ? 50
+          : 30;
+  const upsideScore = args.analystUpsidePercent === null ? null
+    : args.analystUpsidePercent > 25 ? 80
+      : args.analystUpsidePercent > 5 ? 65
+        : args.analystUpsidePercent > -10 ? 45
+          : 25;
+  const coverageScore = args.analystOpinions === null ? null
+    : args.analystOpinions >= 15 ? 75
+      : args.analystOpinions >= 5 ? 60
+        : 40;
+  const shortScore = args.shortPercentOfFloat === null ? null
+    : args.shortPercentOfFloat < 3 ? 75
+      : args.shortPercentOfFloat < 10 ? 55
+        : 30;
+  const attentionScore = args.volumeRatio === null ? null
+    : args.volumeRatio > 2.5 ? 35
+      : args.volumeRatio > 1.3 ? 60
+        : 55;
+  return round(averageScores([recScore, upsideScore, coverageScore, shortScore, attentionScore]), 0);
+}
+
+function buildAlphaScore(args: {
+  technicalScore: number | null;
+  fundamentalScore: number | null;
+  sentimentScore: number | null;
+}) {
+  const score = round(averageScores([args.technicalScore, args.fundamentalScore, args.sentimentScore]), 0);
+  return {
+    score,
+    label: score === null ? "n/a" : score >= 75 ? "High alpha" : score >= 60 ? "Constructive" : score >= 45 ? "Neutral" : "Weak",
+    technicalScore: args.technicalScore,
+    fundamentalScore: args.fundamentalScore,
+    sentimentScore: args.sentimentScore,
+    method: "Proprietary 3-pillar alpha score: technical model, fundamental model, and sentiment/attention proxy from analyst/short-interest/volume data. Social/web sentiment connectors require external APIs.",
+  };
+}
+
+function detectPatterns(points: PricePoint[], metrics: Record<string, number | null | string>) {
+  const recent = points.slice(-90);
+  const closes = recent.map((point) => Number(point.close)).filter(Number.isFinite);
+  const highs = recent.map((point) => Number(point.high ?? point.close)).filter(Number.isFinite);
+  const lows = recent.map((point) => Number(point.low ?? point.close)).filter(Number.isFinite);
+  const slope = linearRegressionSlope(closes);
+  const support = lows.length ? Math.min(...lows.slice(-30)) : null;
+  const resistance = highs.length ? Math.max(...highs.slice(-30)) : null;
+  const lastClose = closes.at(-1) ?? null;
+  const channelWidth = support !== null && resistance !== null && lastClose ? ((resistance - support) / lastClose) * 100 : null;
+  const patterns: Array<{ name: string; signal: string; confidence: number; details: string }> = [];
+
+  if (slope !== null) {
+    patterns.push({
+      name: slope > 0.08 ? "Rising channel / uptrend" : slope < -0.08 ? "Falling channel / downtrend" : "Sideways range",
+      signal: slope > 0.08 ? "bullish" : slope < -0.08 ? "bearish" : "neutral",
+      confidence: Math.min(85, Math.max(35, Math.round(Math.abs(slope) * 140))),
+      details: `90-session regression slope ${round(slope, 3)}% per session`,
+    });
+  }
+  if (support !== null && resistance !== null && lastClose !== null) {
+    const nearSupport = Math.abs((lastClose / support - 1) * 100);
+    const nearResistance = Math.abs((lastClose / resistance - 1) * 100);
+    patterns.push({
+      name: "Support / resistance range",
+      signal: nearSupport < nearResistance ? "near support" : "near resistance",
+      confidence: 70,
+      details: `Support ${round(support, 2)}, resistance ${round(resistance, 2)}, channel width ${round(channelWidth, 2)}%`,
+    });
+  }
+  const rsi = typeof metrics.rsi14 === "number" ? metrics.rsi14 : null;
+  if (rsi !== null && (rsi > 70 || rsi < 30)) {
+    patterns.push({
+      name: rsi > 70 ? "Overbought momentum" : "Oversold momentum",
+      signal: rsi > 70 ? "pullback risk" : "mean-reversion watch",
+      confidence: 60,
+      details: `RSI 14 is ${round(rsi, 1)}`,
+    });
+  }
+  return {
+    support: round(support, 2),
+    resistance: round(resistance, 2),
+    regressionSlopePercentPerSession: round(slope, 4),
+    channelWidthPercent: round(channelWidth, 2),
+    patterns,
+    method: "Mathematical time-series pattern recognition using regression slope, support/resistance, range width, and RSI extremes; no image-based chart computer vision yet.",
+  };
+}
+
+function strategyStats(strategyReturns: number[], points: PricePoint[]) {
+  const validReturns = strategyReturns.filter(Number.isFinite);
+  if (validReturns.length === 0) {
+    return { totalReturn: null, annualizedReturn: null, maxDrawdown: null, winRate: null };
+  }
+  let equity = 1;
+  const equityCurve = validReturns.map((value) => {
+    equity *= 1 + value;
+    return equity;
+  });
+  const totalReturn = (equity - 1) * 100;
+  const years = points.length / 252;
+  const annualized = years > 0 ? (equity ** (1 / years) - 1) * 100 : null;
+  const wins = validReturns.filter((value) => value > 0).length;
+  return {
+    totalReturn: round(totalReturn, 2),
+    annualizedReturn: round(annualized, 2),
+    maxDrawdown: round(maxDrawdown(equityCurve), 2),
+    winRate: round((wins / validReturns.length) * 100, 2),
+  };
+}
+
+function buildStrategyLab(points: PricePoint[]) {
+  const closes = points.map((point) => Number(point.close)).filter(Number.isFinite);
+  const returns = closes.slice(1).map((close, index) => close / closes[index] - 1);
+  const strategies = [
+    {
+      name: "Trend SMA50/SMA200",
+      returns: returns.map((value, index) => {
+        const history = closes.slice(0, index + 1);
+        const sma50 = movingAverage(history, 50);
+        const sma200 = movingAverage(history, 200);
+        return sma50 !== null && sma200 !== null && sma50 > sma200 ? value : 0;
+      }),
+      signal: movingAverage(closes, 50) !== null && movingAverage(closes, 200) !== null && Number(movingAverage(closes, 50)) > Number(movingAverage(closes, 200)) ? "Buy / risk-on" : "Avoid / risk-off",
+    },
+    {
+      name: "RSI mean reversion",
+      returns: returns.map((value, index) => {
+        const signalRsi = rsi(closes.slice(0, index + 15));
+        return signalRsi !== null && signalRsi < 35 ? value : 0;
+      }),
+      signal: rsi(closes) !== null && Number(rsi(closes)) < 35 ? "Buy mean-reversion setup" : "No active mean-reversion setup",
+    },
+    {
+      name: "20-day breakout",
+      returns: returns.map((value, index) => {
+        const history = closes.slice(Math.max(0, index - 20), index + 1);
+        const previousHigh = history.length ? Math.max(...history) : null;
+        return previousHigh !== null && closes[index] > previousHigh ? value : 0;
+      }),
+      signal: closes.length > 21 && closes.at(-1)! > Math.max(...closes.slice(-21, -1)) ? "Breakout buy signal" : "No breakout signal",
+    },
+  ];
+  const tested = strategies.map((strategy) => ({
+    name: strategy.name,
+    signal: strategy.signal,
+    ...strategyStats(strategy.returns, points.slice(-strategy.returns.length)),
+  })).sort((a, b) => (Number(b.annualizedReturn ?? -999) - Number(a.annualizedReturn ?? -999)));
+  return {
+    bestStrategy: tested[0]?.name ?? "n/a",
+    strategies: tested,
+    method: "On-demand overnight-style strategy lab over historical data. True nightly batch optimization over thousands of combinations requires scheduled infrastructure.",
+  };
+}
+
+function buildSeasonality(points: PricePoint[]) {
+  const byMonth = new Map<string, PricePoint[]>();
+  points.forEach((point) => {
+    const key = `${point.date.getUTCFullYear()}-${point.date.getUTCMonth()}`;
+    const group = byMonth.get(key) ?? [];
+    group.push(point);
+    byMonth.set(key, group);
+  });
+  const buckets = Array.from({ length: 12 }, () => [] as number[]);
+  byMonth.forEach((group, key) => {
+    const first = group[0]?.close;
+    const last = group.at(-1)?.close;
+    const month = Number(key.split("-")[1]);
+    if (typeof first === "number" && typeof last === "number" && first > 0) {
+      buckets[month].push((last / first - 1) * 100);
+    }
+  });
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthly = buckets.map((values, index) => ({
+    month: monthNames[index],
+    averageReturn: round(mean(values), 2),
+    winRate: values.length ? round((values.filter((value) => value > 0).length / values.length) * 100, 2) : null,
+    samples: values.length,
+  }));
+  const best = [...monthly].sort((a, b) => Number(b.averageReturn ?? -999) - Number(a.averageReturn ?? -999))[0];
+  const worst = [...monthly].sort((a, b) => Number(a.averageReturn ?? 999) - Number(b.averageReturn ?? 999))[0];
+  return {
+    monthly,
+    bestMonth: best?.month ?? "n/a",
+    worstMonth: worst?.month ?? "n/a",
+    method: "Calendar-month seasonality from available historical monthly returns.",
+  };
+}
+
+function buildDataConnectorStatus() {
+  return [
+    { name: "Social/web sentiment", status: "connector-required", detail: "Requires Reddit/X/TikTok/forum APIs or approved data vendor. Current app uses analyst/short-interest/volume proxy only." },
+    { name: "Business footprint", status: "connector-required", detail: "Job postings, web traffic, and app downloads require external providers." },
+    { name: "Insider trading", status: "connector-required", detail: "Needs SEC/Form 4 or licensed insider transaction feed." },
+    { name: "Politician trading", status: "connector-required", detail: "Needs congressional/political trade disclosure feed." },
+    { name: "COT reports", status: "connector-required", detail: "Needs CFTC COT data integration, mostly useful for futures/commodities/FX." },
+    { name: "Macro overlay", status: "connector-required", detail: "Needs FRED/OECD/ECB/BLS or macro data provider for live overlays." },
+  ];
+}
+
 function buildPromptContext(args: {
   displayName: string;
   symbol: string;
@@ -1203,9 +1462,10 @@ function buildPromptContext(args: {
   };
   fundamentals: Record<string, number | null | string>;
   researchScores: Record<string, number | null | string | string[]>;
+  advancedIntelligence: Record<string, unknown>;
   links: { yahoo: string; tradingView: string };
 }) {
-  const { displayName, symbol, exchange, currency, quoteType, quote, metrics, tradeLevels, forecast, fundamentals, researchScores, links } = args;
+  const { displayName, symbol, exchange, currency, quoteType, quote, metrics, tradeLevels, forecast, fundamentals, researchScores, advancedIntelligence, links } = args;
 
   return `Market data automatically retrieved from Yahoo Finance for ${displayName} (${symbol}).
 Numerical source: Yahoo Finance quote and 5Y daily chart. Verification links: Yahoo ${links.yahoo}; TradingView ${links.tradingView}.
@@ -1234,6 +1494,13 @@ Research dashboard scores:
 - Dividend quality: ${researchScores.dividend ?? "n/a"}/100
 - Research checks: ${Array.isArray(researchScores.checks) ? researchScores.checks.join("; ") : "n/a"}
 - Method: ${researchScores.method ?? "n/a"}
+
+Advanced intelligence modules:
+- Alpha Score: ${(advancedIntelligence.alphaScore as Record<string, unknown> | undefined)?.score ?? "n/a"}/100; technical ${(advancedIntelligence.alphaScore as Record<string, unknown> | undefined)?.technicalScore ?? "n/a"}, fundamental ${(advancedIntelligence.alphaScore as Record<string, unknown> | undefined)?.fundamentalScore ?? "n/a"}, sentiment proxy ${(advancedIntelligence.alphaScore as Record<string, unknown> | undefined)?.sentimentScore ?? "n/a"}
+- Detected patterns: ${JSON.stringify((advancedIntelligence.patternRecognition as Record<string, unknown> | undefined)?.patterns ?? [])}
+- Strategy lab best strategy: ${(advancedIntelligence.strategyLab as Record<string, unknown> | undefined)?.bestStrategy ?? "n/a"}
+- Seasonality best/worst months: ${(advancedIntelligence.seasonality as Record<string, unknown> | undefined)?.bestMonth ?? "n/a"} / ${(advancedIntelligence.seasonality as Record<string, unknown> | undefined)?.worstMonth ?? "n/a"}
+- Alternative data connector status: ${JSON.stringify(advancedIntelligence.dataConnectors ?? [])}
 
 Fundamental snapshot:
 - Sector / industry: ${fundamentals.sector ?? "n/a"} / ${fundamentals.industry ?? "n/a"}
@@ -1328,7 +1595,7 @@ async function getMarketData(query: string) {
 
   const symbol = match.symbol;
   const period1 = new Date();
-  period1.setFullYear(period1.getFullYear() - 5);
+  period1.setFullYear(period1.getFullYear() - 20);
 
   const [quoteResult, chartResult, quoteSummaryResult] = await Promise.all([
     yahooFinance.quote(symbol),
@@ -1559,6 +1826,37 @@ async function getMarketData(query: string) {
     ...fundamentals,
     analystUpsidePercent: round(analystUpsidePercent, 2),
   };
+  const volumeRatio = numeric(quote.averageDailyVolume3Month) && numeric(quote.regularMarketVolume)
+    ? Number(numeric(quote.regularMarketVolume)) / Number(numeric(quote.averageDailyVolume3Month))
+    : null;
+  const technicalAlphaScore = scoreTechnicalModel({
+    lastClose,
+    sma50,
+    sma200,
+    rsi14: baseMetrics.rsi14,
+    annualizedVolatility: baseMetrics.annualizedVolatility,
+    maxDrawdown: baseMetrics.maxDrawdown,
+    distanceFrom52WeekHigh: baseMetrics.distanceFrom52WeekHigh,
+  });
+  const sentimentScore = scoreSentimentProxy({
+    recommendationMean: enrichedFundamentals.recommendationMean,
+    analystUpsidePercent: enrichedFundamentals.analystUpsidePercent,
+    analystOpinions: enrichedFundamentals.analystOpinions,
+    shortPercentOfFloat: enrichedFundamentals.shortPercentOfFloat,
+    volumeRatio,
+  });
+  const alphaScore = buildAlphaScore({
+    technicalScore: technicalAlphaScore,
+    fundamentalScore: researchScores.overall,
+    sentimentScore,
+  });
+  const advancedIntelligence = {
+    alphaScore,
+    patternRecognition: detectPatterns(pricePoints, baseMetrics),
+    strategyLab: buildStrategyLab(pricePoints),
+    seasonality: buildSeasonality(pricePoints),
+    dataConnectors: buildDataConnectorStatus(),
+  };
 
   const displayName = textValue(quote.longName) || textValue(quote.shortName) || textValue(match.longname) || textValue(match.shortname) || symbol;
   const exchange = textValue(quote.fullExchangeName) || textValue(quote.exchange) || textValue(match.exchDisp);
@@ -1603,6 +1901,7 @@ async function getMarketData(query: string) {
     },
     fundamentals: enrichedFundamentals,
     researchScores,
+    advancedIntelligence,
     quote: {
       regularMarketPrice: round(numeric(quote.regularMarketPrice), 2),
       regularMarketChangePercent: round(numeric(quote.regularMarketChangePercent), 2),
@@ -1632,6 +1931,7 @@ async function getMarketData(query: string) {
       forecast,
       fundamentals: enrichedFundamentals as Record<string, number | null | string>,
       researchScores: researchScores as Record<string, number | null | string | string[]>,
+      advancedIntelligence: advancedIntelligence as Record<string, unknown>,
       links,
     }),
   };
