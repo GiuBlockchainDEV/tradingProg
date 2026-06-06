@@ -350,27 +350,46 @@ function formatCompact(value: number | null) {
 
 function scoreTone(score: number | null) {
   if (score === null) return "muted";
-  if (score >= 70) return "good";
-  if (score >= 45) return "mixed";
-  return "weak";
+  if (score >= 70) return "score-green";
+  if (score >= 45) return "score-orange";
+  return "score-red";
 }
 
 function formatScore(score: number | null) {
   return score === null ? "n/a" : `${score}/100`;
 }
 
+function renderInlineToken(token: string, key: string) {
+  const scoreMatch = token.match(/\b(100|\d{1,2})\/100\b/);
+  if (scoreMatch) {
+    const score = Number(scoreMatch[1]);
+    return <span className={`score-pill ${scoreTone(score)}`} key={key}>{token}</span>;
+  }
+
+  return token;
+}
+
 function parseInline(text: string) {
-  const strongPattern = /\*\*(.*?)\*\*/g;
+  const inlinePattern = /(\*\*.*?\*\*|`.*?`|\b(?:100|\d{1,2})\/100\b)/g;
   const parts: ReactNode[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
-  while ((match = strongPattern.exec(text)) !== null) {
+  while ((match = inlinePattern.exec(text)) !== null) {
     if (match.index > lastIndex) {
       parts.push(text.slice(lastIndex, match.index));
     }
-    parts.push(<strong key={`${match.index}-${match[1]}`}>{match[1]}</strong>);
-    lastIndex = strongPattern.lastIndex;
+
+    const token = match[0];
+    if (token.startsWith("**") && token.endsWith("**")) {
+      parts.push(<strong key={`${match.index}-${token}`}>{parseInline(token.slice(2, -2))}</strong>);
+    } else if (token.startsWith("`") && token.endsWith("`")) {
+      parts.push(<code className="inline-code" key={`${match.index}-${token}`}>{token.slice(1, -1)}</code>);
+    } else {
+      parts.push(renderInlineToken(token, `${match.index}-${token}`));
+    }
+
+    lastIndex = inlinePattern.lastIndex;
   }
 
   if (lastIndex < text.length) {
@@ -425,6 +444,18 @@ function MarkdownBlock({ block }: { block: string }) {
     return null;
   }
 
+  if (/^-{3,}$/.test(trimmed)) {
+    return <hr className="markdown-rule" />;
+  }
+
+  if (trimmed.startsWith("```") && trimmed.endsWith("```")) {
+    return <pre className="code-block"><code>{trimmed.replace(/^```\w*\n?/, "").replace(/```$/, "")}</code></pre>;
+  }
+
+  if (trimmed.startsWith(">")) {
+    return <blockquote>{parseInline(trimmed.replace(/^>\s?/gm, ""))}</blockquote>;
+  }
+
   if (trimmed.includes("|") && trimmed.split("\n").some((line) => line.trim().startsWith("|"))) {
     return <MarkdownTable block={trimmed} />;
   }
@@ -445,12 +476,14 @@ function MarkdownBlock({ block }: { block: string }) {
   const isList = lines.every((line) => /^\s*(-|\*|\d+\.)\s+/.test(line));
 
   if (isList) {
+    const ordered = lines.every((line) => /^\s*\d+\.\s+/.test(line));
+    const ListTag = ordered ? "ol" : "ul";
     return (
-      <ul>
-        {lines.map((line) => (
-          <li key={line}>{parseInline(line.replace(/^\s*(-|\*|\d+\.)\s+/, ""))}</li>
+      <ListTag>
+        {lines.map((line, index) => (
+          <li key={`${line}-${index}`}>{parseInline(line.replace(/^\s*(-|\*|\d+\.)\s+/, ""))}</li>
         ))}
-      </ul>
+      </ListTag>
     );
   }
 
@@ -1004,7 +1037,7 @@ export default function Home() {
               </div>
             </div>
             <div className="insight-grid" aria-label="Live analysis summary">
-              <article className="insight-card primary-score">
+              <article className={`insight-card primary-score ${scoreTone(marketData.metrics.investmentScore)}`}>
                 <span>Investment score</span>
                 <strong>{`${marketData.metrics.investmentScore}/100`}</strong>
                 <small>{marketData.metrics.investmentScoreLabel}</small>
