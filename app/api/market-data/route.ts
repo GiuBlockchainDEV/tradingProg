@@ -1234,6 +1234,12 @@ Calculated technical metrics:
 - 30-session average volume: ${compactNumber(metrics.averageVolume30 as number | null)}
 - Trend regime: ${metrics.trend}
 
+Macro/geopolitical scenario framework:
+- Sector: ${fundamentals.sector ?? "n/a"}
+- Industry: ${fundamentals.industry ?? "n/a"}
+- Macro variables to stress test: interest rates, inflation, FX translation, consumer/enterprise demand cycle, credit/liquidity conditions, sector regulation, geopolitical/geographic exposure, and broad equity risk appetite.
+- Important limitation: no live news or real-time macro feed is included unless explicitly provided; macro/geopolitical analysis must be framed as scenario sensitivity, not current-news certainty.
+
 Key fundamentals:
 - Market cap: ${compactNumber(numeric(quote.marketCap))}
 - Trailing P/E: ${round(numeric(quote.trailingPE), 2) ?? "n/a"}
@@ -1250,7 +1256,7 @@ Key fundamentals:
 - Dividend history events used: ${quote.dividendHistoryCount ?? "n/a"}
 - Beta: ${round(numeric(quote.beta), 2) ?? "n/a"}
 
-Instructions: use these data points as the base for the report, do not invent missing metrics, keep the investment score and buy/sell/risk levels visible, and recommend verification on TradingView/Yahoo before execution.`;}
+Instructions: use these USD-normalized data points as the base for the report, do not invent missing metrics, keep the investment score, research scores, buy/sell/risk levels, scenario probabilities, target timeframes, dividend profile, and forecast visible. Treat macro/geopolitical comments as scenario sensitivity unless live data is explicitly provided. Recommend verification on TradingView/Yahoo and official company filings before execution.`;}
 
 async function getMarketData(query: string) {
   const search = await yahooFinance.search(query, { quotesCount: 8, newsCount: 0 }) as unknown as { quotes?: Array<Record<string, string>> };

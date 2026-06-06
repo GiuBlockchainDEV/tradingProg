@@ -72,3 +72,7 @@ Bullish, normal, and bearish probabilities are estimated with deterministic boot
 ## USD normalization
 
 All monetary values shown in the UI and passed to the report are normalized to USD. If Yahoo Finance returns a quote in another currency, the backend retrieves a Yahoo FX pair when available, converts price history, quote values, dividends, analyst targets, buy/sell/risk levels, and forecast values to USD, and returns the original currency plus the FX rate used for traceability.
+
+## Prompt quality
+
+The analysis prompt is optimized for objective, reality-based output. It weighs company fundamentals, valuation and analyst consensus, financial health, trend analytics, quantitative risk models, dividends, target probabilities/timeframes, 3-month forecast scenarios, and macro/geopolitical sensitivity. Missing or stale data must be flagged rather than invented, and analyst targets are treated as one input rather than truth.
