@@ -34,7 +34,8 @@ AI_MODEL=
 ## Environment variables
 
 - `AI_API_KEY`: the AI provider API key, required by the server analysis route.
-- `AI_MODEL`: optional model override.
+- `AI_MODEL`: optional model override
+- `AI_FALLBACK_MODELS`: optional comma-separated model list used automatically when the primary model is overloaded or rate-limited.
 
 ## Product notes
 
@@ -80,3 +81,5 @@ The analysis prompt is optimized for objective, reality-based output. It weighs 
 ## Advanced intelligence modules
 
 The API now returns an Alpha Score built from three pillars: technical model, fundamental model, and sentiment/attention proxy. It also returns mathematical pattern recognition, an on-demand strategy lab/backtest over simple indicator strategies, calendar-month seasonality, and connector status for external alternative data sources such as social sentiment, business footprint, insider trading, politician trading, COT, and macro overlays. External feeds require dedicated APIs or data vendors before they can become live data modules.
+
+The server retries temporary AI failures with exponential backoff and then tries fallback models before returning an error.

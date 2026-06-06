@@ -52,6 +52,63 @@ const workflowCatalog = {
   },
 } as const;
 
+
+function modelCandidates() {
+  const configured = [process.env.AI_MODEL, process.env.GEMINI_MODEL]
+    .flatMap((value) => value?.split(",") ?? [])
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const fallback = (process.env.AI_FALLBACK_MODELS || "gemini-2.0-flash,gemini-1.5-flash")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return Array.from(new Set([...configured, "gemini-2.5-flash", ...fallback]));
+}
+
+function isRetriableAiError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /503|Service Unavailable|high demand|429|RESOURCE_EXHAUSTED|quota|timeout|fetch failed/i.test(message);
+}
+
+function cleanAiError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/503|Service Unavailable|high demand/i.test(message)) {
+    return "The AI service is temporarily overloaded. Please try again shortly.";
+  }
+  if (/429|RESOURCE_EXHAUSTED|quota/i.test(message)) {
+    return "The AI service rate limit was reached. Please try again shortly.";
+  }
+  return "The AI service could not complete the request.";
+}
+
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function generateTextWithFallback(apiKey: string, prompt: string) {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  let lastError: unknown;
+
+  for (const modelName of modelCandidates()) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent(prompt);
+        return { text: result.response.text(), modelName };
+      } catch (error) {
+        lastError = error;
+        if (!isRetriableAiError(error)) {
+          throw error;
+        }
+        await sleep(500 * (attempt + 1));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 type AiRequest = {
   workflow?: string;
   market?: string;
@@ -172,23 +229,15 @@ export async function POST(request: Request) {
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: process.env.AI_MODEL || process.env.GEMINI_MODEL || "gemini-2.5-flash",
-    });
-
-    const result = await model.generateContent(buildPrompt(body));
-    const text = result.response.text();
+    const generated = await generateTextWithFallback(apiKey, buildPrompt(body));
 
     return NextResponse.json({
       workflow: "Full 12-module integrated analysis",
-      result: text,
+      result: generated.text,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error while generating the AI response.";
-
     return NextResponse.json(
-      { error: `The AI engine did not complete the request: ${message}` },
+      { error: cleanAiError(error) },
       { status: 502 },
     );
   }

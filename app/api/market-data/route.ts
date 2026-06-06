@@ -4,6 +4,52 @@ import { NextResponse } from "next/server";
 
 const yahooFinance = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
 
+
+function modelCandidates() {
+  const configured = [process.env.AI_MODEL, process.env.GEMINI_MODEL]
+    .flatMap((value) => value?.split(",") ?? [])
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const fallback = (process.env.AI_FALLBACK_MODELS || "gemini-2.0-flash,gemini-1.5-flash")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return Array.from(new Set([...configured, "gemini-2.5-flash", ...fallback]));
+}
+
+function isRetriableAiError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /503|Service Unavailable|high demand|429|RESOURCE_EXHAUSTED|quota|timeout|fetch failed/i.test(message);
+}
+
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function generateTextWithFallback(apiKey: string, prompt: string) {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  let lastError: unknown;
+
+  for (const modelName of modelCandidates()) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent(prompt);
+        return { text: result.response.text(), modelName };
+      } catch (error) {
+        lastError = error;
+        if (!isRetriableAiError(error)) {
+          throw error;
+        }
+        await sleep(500 * (attempt + 1));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 type MarketDataRequest = {
   query?: string;
 };
@@ -836,13 +882,9 @@ async function generateAiThreeMonthForecast(args: {
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: process.env.AI_MODEL || process.env.GEMINI_MODEL || "gemini-2.5-flash",
-    });
     const prompt = `Generate a conservative 3-month price forecast cone as strict JSON only.\n\nRules:\n- Use the historical prices, volatility and quantitative baseline below.\n- Do not be optimistic. Treat this as a scenario cone, not a promise.\n- Preserve the same sessions and date count as the baseline.\n- Output only valid JSON. No markdown.\n- JSON shape: {"source":"AI forecast + historical baseline","confidenceNote":"...","method":"...","points":[{"session":0,"date":"YYYY-MM-DD","lower":number,"base":number,"upper":number}]}\n- For each point enforce lower <= base <= upper.\n\nAsset: ${args.displayName} (${args.symbol})\nCurrency: ${args.currency ?? "n/a"}\nLast close: ${args.lastClose}\nTrend: ${args.trend}\n1Y return: ${args.oneYearReturn ?? "n/a"}%\nAnnualized volatility: ${args.annualizedVolatility ?? "n/a"}%\nMax drawdown: ${args.maxDrawdown ?? "n/a"}%\nRecent history sample: ${JSON.stringify(args.recentHistory.slice(-90))}\nQuantitative baseline: ${JSON.stringify(args.quantitativeForecast.points)}`;
-    const result = await model.generateContent(prompt);
-    const parsed = extractJsonObject(result.response.text()) as Record<string, unknown>;
+    const generated = await generateTextWithFallback(apiKey, prompt);
+    const parsed = extractJsonObject(generated.text) as Record<string, unknown>;
     const aiPointsInput = Array.isArray(parsed.points) ? parsed.points : [];
     const points = args.quantitativeForecast.points.map((fallback, index) => normalizeAiForecastPoint(aiPointsInput[index], fallback));
 
