@@ -520,21 +520,22 @@ function ResearchSnowflake({ marketData }: { marketData: MarketData }) {
     { key: "health", label: "Health", score: marketData.researchScores.health },
     { key: "dividend", label: "Dividend", score: marketData.researchScores.dividend },
   ];
-  const center = 120;
-  const maxRadius = 92;
+  const centerX = 150;
+  const centerY = 130;
+  const maxRadius = 78;
   const pointFor = (index: number, score: number | null) => {
     const angle = -Math.PI / 2 + (index / axes.length) * Math.PI * 2;
     const radius = ((score ?? 0) / 100) * maxRadius;
     return {
-      x: center + Math.cos(angle) * radius,
-      y: center + Math.sin(angle) * radius,
+      x: centerX + Math.cos(angle) * radius,
+      y: centerY + Math.sin(angle) * radius,
     };
   };
   const labelFor = (index: number) => {
     const angle = -Math.PI / 2 + (index / axes.length) * Math.PI * 2;
     return {
-      x: center + Math.cos(angle) * 113,
-      y: center + Math.sin(angle) * 113,
+      x: centerX + Math.cos(angle) * 118,
+      y: centerY + Math.sin(angle) * 112,
     };
   };
   const polygon = axes.map((axis, index) => {
@@ -557,7 +558,7 @@ function ResearchSnowflake({ marketData }: { marketData: MarketData }) {
             </ul>
           )}
         </div>
-        <svg className="snowflake-chart" viewBox="0 0 240 240" role="img" aria-label="Five-axis research score radar">
+        <svg className="snowflake-chart" viewBox="0 0 300 260" role="img" aria-label="Five-axis research score radar">
           {[25, 50, 75, 100].map((ring) => {
             const ringPoints = axes.map((_, index) => {
               const point = pointFor(index, ring);
@@ -570,7 +571,7 @@ function ResearchSnowflake({ marketData }: { marketData: MarketData }) {
             const label = labelFor(index);
             return (
               <g key={axis.key}>
-                <line x1={center} y1={center} x2={outer.x} y2={outer.y} className="snowflake-axis" />
+                <line x1={centerX} y1={centerY} x2={outer.x} y2={outer.y} className="snowflake-axis" />
                 <text x={label.x} y={label.y} textAnchor="middle" dominantBaseline="middle" className="snowflake-label">
                   {axis.label}
                 </text>
