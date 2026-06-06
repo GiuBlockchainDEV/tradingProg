@@ -977,87 +977,98 @@ export default function Home() {
           {error && <div className="error-box compact-error">{error}</div>}
       </section>
 
-      <section className="insight-grid" aria-label="Live analysis summary">
-        <article className="insight-card primary-score">
-          <span>Investment score</span>
-          <strong>{marketData ? `${marketData.metrics.investmentScore}/100` : "--/100"}</strong>
-          <small>{marketData ? marketData.metrics.investmentScoreLabel : "Generated after analysis"}</small>
-        </article>
-        <article className="insight-card">
-          <span>Buy zone</span>
-          <strong>
-            {marketData
-              ? `${formatPrice(marketData.tradeLevels.buyZoneLow, marketData.currency)} - ${formatPrice(marketData.tradeLevels.buyZoneHigh, marketData.currency)}`
-              : "Waiting for stock"}
-          </strong>
-          <small>{marketData ? `Preferred: ${formatPrice(marketData.tradeLevels.preferredBuy, marketData.currency)}` : "Objective pullback area"}</small>
-        </article>
-        <article className="insight-card">
-          <span>Sell targets</span>
-          <strong>
-            {marketData
-              ? `${formatPrice(marketData.tradeLevels.target1, marketData.currency)} / ${formatPrice(marketData.tradeLevels.target2, marketData.currency)}`
-              : "Waiting for stock"}
-          </strong>
-          <small>Target 1 / Target 2</small>
-        </article>
-        <article className="insight-card odds-card">
-          <span>Target odds</span>
-          <strong>
-            {marketData
-              ? `${formatPercent(marketData.tradeLevels.target1Probability)} / ${formatPercent(marketData.tradeLevels.target2Probability)}`
-              : "-- / --"}
-          </strong>
-          <small>
-            {marketData
-              ? `T1 ${marketData.tradeLevels.target1ExpectedTimeframe ?? "n/a"} | T2 ${marketData.tradeLevels.target2ExpectedTimeframe ?? "n/a"}`
-              : "Target 1 / Target 2 probability"}
-          </small>
-        </article>
-        <article className="insight-card risk-card">
-          <span>Risk to stop</span>
-          <strong>{marketData ? formatPercent(marketData.tradeLevels.riskPercent) : "--"}</strong>
-          <small>{marketData ? `Stop: ${formatPrice(marketData.tradeLevels.stopLoss, marketData.currency)}` : "Calculated from levels"}</small>
-        </article>
-        <article className="insight-card dividend-card">
-          <span>Dividend profile</span>
-          <strong>{marketData ? formatPrice(marketData.quote.averageDividendPayment, marketData.currency) : "--"}</strong>
-          <small>
-            {marketData
-              ? `Avg historical payment | annual ${formatPrice(marketData.quote.dividendRate ?? marketData.quote.trailingAnnualDividendRate, marketData.currency)} | ex ${marketData.quote.exDividendDate ?? "n/a"}`
-              : "Amount and timing from Yahoo"}
-          </small>
-        </article>
-      </section>
-
       {marketData && (
-        <section className="market-summary" aria-label="Resolved market data">
-          <div>
-            <span className="eyebrow">Resolved asset</span>
-            <h2>{marketData.displayName} <small>({marketData.symbol})</small></h2>
-          </div>
-          <div className="summary-metrics">
-            <span>{formatPrice(marketData.quote.regularMarketPrice, marketData.currency)}</span>
-            <span>{formatPercent(marketData.quote.regularMarketChangePercent)} today</span>
-            <span>{marketData.originalCurrency && marketData.originalCurrency !== "USD" ? `Converted from ${marketData.originalCurrency}` : "USD values"}</span>
-            <span>Dividend yield {formatPercent(marketData.quote.dividendYield ?? marketData.quote.trailingAnnualDividendYield)}</span>
-            <span>{marketData.quote.dividendDate ? `Payment ${marketData.quote.dividendDate}` : marketData.quote.dividendFrequency}</span>
-            <span>{marketData.metrics.trend}</span>
-          </div>
-          <div className="source-links">
-            <a href={marketData.links.yahoo} target="_blank" rel="noreferrer">Yahoo Finance</a>
-            <a href={marketData.links.tradingView} target="_blank" rel="noreferrer">TradingView</a>
-          </div>
-        </section>
+        <div className="analysis-results">
+          <section className="market-summary" aria-label="Resolved market data">
+            <div>
+              <span className="eyebrow">Resolved asset</span>
+              <h2>{marketData.displayName} <small>({marketData.symbol})</small></h2>
+            </div>
+            <div className="summary-metrics">
+              <span>{formatPrice(marketData.quote.regularMarketPrice, marketData.currency)}</span>
+              <span>{formatPercent(marketData.quote.regularMarketChangePercent)} today</span>
+              <span>{marketData.originalCurrency && marketData.originalCurrency !== "USD" ? `Converted from ${marketData.originalCurrency}` : "USD values"}</span>
+              <span>{marketData.metrics.trend}</span>
+            </div>
+            <div className="source-links">
+              <a href={marketData.links.yahoo} target="_blank" rel="noreferrer">Yahoo Finance</a>
+              <a href={marketData.links.tradingView} target="_blank" rel="noreferrer">TradingView</a>
+            </div>
+          </section>
+
+          <section className="result-section">
+            <div className="section-title-row">
+              <div>
+                <span className="eyebrow">Decision snapshot</span>
+                <h2>Score, targets and risk</h2>
+              </div>
+            </div>
+            <div className="insight-grid" aria-label="Live analysis summary">
+              <article className="insight-card primary-score">
+                <span>Investment score</span>
+                <strong>{`${marketData.metrics.investmentScore}/100`}</strong>
+                <small>{marketData.metrics.investmentScoreLabel}</small>
+              </article>
+              <article className="insight-card">
+                <span>Buy zone</span>
+                <strong>{`${formatPrice(marketData.tradeLevels.buyZoneLow, marketData.currency)} - ${formatPrice(marketData.tradeLevels.buyZoneHigh, marketData.currency)}`}</strong>
+                <small>Preferred: {formatPrice(marketData.tradeLevels.preferredBuy, marketData.currency)}</small>
+              </article>
+              <article className="insight-card">
+                <span>Sell targets</span>
+                <strong>{`${formatPrice(marketData.tradeLevels.target1, marketData.currency)} / ${formatPrice(marketData.tradeLevels.target2, marketData.currency)}`}</strong>
+                <small>Target 1 / Target 2</small>
+              </article>
+              <article className="insight-card odds-card">
+                <span>Target odds</span>
+                <strong>{`${formatPercent(marketData.tradeLevels.target1Probability)} / ${formatPercent(marketData.tradeLevels.target2Probability)}`}</strong>
+                <small>{`T1 ${marketData.tradeLevels.target1ExpectedTimeframe ?? "n/a"} | T2 ${marketData.tradeLevels.target2ExpectedTimeframe ?? "n/a"}`}</small>
+              </article>
+              <article className="insight-card risk-card">
+                <span>Risk to stop</span>
+                <strong>{formatPercent(marketData.tradeLevels.riskPercent)}</strong>
+                <small>Stop: {formatPrice(marketData.tradeLevels.stopLoss, marketData.currency)}</small>
+              </article>
+              <article className="insight-card dividend-card">
+                <span>Dividend profile</span>
+                <strong>{formatPrice(marketData.quote.averageDividendPayment, marketData.currency)}</strong>
+                <small>{`Annual ${formatPrice(marketData.quote.dividendRate ?? marketData.quote.trailingAnnualDividendRate, marketData.currency)} | ex ${marketData.quote.exDividendDate ?? "n/a"}`}</small>
+              </article>
+            </div>
+          </section>
+
+          <section className="result-section">
+            <div className="section-title-row">
+              <div>
+                <span className="eyebrow">Research scores</span>
+                <h2>Visual company profile</h2>
+              </div>
+            </div>
+            <ResearchSnowflake marketData={marketData} />
+            <FundamentalCards marketData={marketData} />
+          </section>
+
+          <section className="result-section">
+            <div className="section-title-row">
+              <div>
+                <span className="eyebrow">Advanced intelligence</span>
+                <h2>Alpha, patterns, strategy lab and seasonality</h2>
+              </div>
+            </div>
+            <AdvancedIntelligenceCards marketData={marketData} />
+          </section>
+
+          <section className="result-section">
+            <div className="section-title-row">
+              <div>
+                <span className="eyebrow">Forecast</span>
+                <h2>Scenario paths</h2>
+              </div>
+            </div>
+            <ForecastChart marketData={marketData} />
+          </section>
+        </div>
       )}
-
-      {marketData && <ResearchSnowflake marketData={marketData} />}
-
-      {marketData && <FundamentalCards marketData={marketData} />}
-
-      {marketData && <AdvancedIntelligenceCards marketData={marketData} />}
-
-      {marketData && <ForecastChart marketData={marketData} />}
 
       {result && (
         <section className="output-section" id="report" aria-live="polite">
