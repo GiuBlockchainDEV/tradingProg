@@ -490,6 +490,16 @@ function MarkdownBlock({ block }: { block: string }) {
   return <p>{parseInline(trimmed)}</p>;
 }
 
+function normalizeMarkdown(content: string) {
+  return content
+    .replace(/\r\n/g, "\n")
+    .replace(/([^\n])\s+(#{1,3}\s+)/g, "$1\n\n$2")
+    .replace(/(^|\n)([A-Z][A-Za-z /&-]{3,80}:?)\s+\*\s+/g, "$1### $2\n- ")
+    .replace(/\s+\*\s+(?=[A-Z0-9])/g, "\n- ")
+    .replace(/([^\n])\s+(\d+\.\s+[A-Z])/g, "$1\n$2")
+    .replace(/\n{3,}/g, "\n\n");
+}
+
 function MarkdownResult({ content }: { content: string }) {
   const blocks = content.split(/\n{2,}/).filter(Boolean);
 
@@ -1036,37 +1046,39 @@ export default function Home() {
                 <h2>Score, targets and risk</h2>
               </div>
             </div>
-            <div className="insight-grid" aria-label="Live analysis summary">
-              <article className={`insight-card primary-score ${scoreTone(marketData.metrics.investmentScore)}`}>
+            <div className="decision-layout" aria-label="Live analysis summary">
+              <article className={`decision-score-card ${scoreTone(marketData.metrics.investmentScore)}`}>
                 <span>Investment score</span>
                 <strong>{`${marketData.metrics.investmentScore}/100`}</strong>
                 <small>{marketData.metrics.investmentScoreLabel}</small>
               </article>
-              <article className="insight-card">
-                <span>Buy zone</span>
-                <strong>{`${formatPrice(marketData.tradeLevels.buyZoneLow, marketData.currency)} - ${formatPrice(marketData.tradeLevels.buyZoneHigh, marketData.currency)}`}</strong>
-                <small>Preferred: {formatPrice(marketData.tradeLevels.preferredBuy, marketData.currency)}</small>
-              </article>
-              <article className="insight-card">
-                <span>Sell targets</span>
-                <strong>{`${formatPrice(marketData.tradeLevels.target1, marketData.currency)} / ${formatPrice(marketData.tradeLevels.target2, marketData.currency)}`}</strong>
-                <small>Target 1 / Target 2</small>
-              </article>
-              <article className="insight-card odds-card">
-                <span>Target odds</span>
-                <strong>{`${formatPercent(marketData.tradeLevels.target1Probability)} / ${formatPercent(marketData.tradeLevels.target2Probability)}`}</strong>
-                <small>{`T1 ${marketData.tradeLevels.target1ExpectedTimeframe ?? "n/a"} | T2 ${marketData.tradeLevels.target2ExpectedTimeframe ?? "n/a"}`}</small>
-              </article>
-              <article className="insight-card risk-card">
-                <span>Risk to stop</span>
-                <strong>{formatPercent(marketData.tradeLevels.riskPercent)}</strong>
-                <small>Stop: {formatPrice(marketData.tradeLevels.stopLoss, marketData.currency)}</small>
-              </article>
-              <article className="insight-card dividend-card">
-                <span>Dividend profile</span>
-                <strong>{formatPrice(marketData.quote.averageDividendPayment, marketData.currency)}</strong>
-                <small>{`Annual ${formatPrice(marketData.quote.dividendRate ?? marketData.quote.trailingAnnualDividendRate, marketData.currency)} | ex ${marketData.quote.exDividendDate ?? "n/a"}`}</small>
-              </article>
+              <div className="decision-detail-grid">
+                <article className="decision-card">
+                  <span>Buy zone</span>
+                  <strong>{`${formatPrice(marketData.tradeLevels.buyZoneLow, marketData.currency)} - ${formatPrice(marketData.tradeLevels.buyZoneHigh, marketData.currency)}`}</strong>
+                  <small>Preferred: {formatPrice(marketData.tradeLevels.preferredBuy, marketData.currency)}</small>
+                </article>
+                <article className="decision-card">
+                  <span>Sell targets</span>
+                  <strong>{`${formatPrice(marketData.tradeLevels.target1, marketData.currency)} / ${formatPrice(marketData.tradeLevels.target2, marketData.currency)}`}</strong>
+                  <small>Target 1 / Target 2</small>
+                </article>
+                <article className="decision-card odds-card">
+                  <span>Target odds</span>
+                  <strong>{`${formatPercent(marketData.tradeLevels.target1Probability)} / ${formatPercent(marketData.tradeLevels.target2Probability)}`}</strong>
+                  <small>{`T1 ${marketData.tradeLevels.target1ExpectedTimeframe ?? "n/a"} | T2 ${marketData.tradeLevels.target2ExpectedTimeframe ?? "n/a"}`}</small>
+                </article>
+                <article className="decision-card risk-card">
+                  <span>Risk to stop</span>
+                  <strong>{formatPercent(marketData.tradeLevels.riskPercent)}</strong>
+                  <small>Stop: {formatPrice(marketData.tradeLevels.stopLoss, marketData.currency)}</small>
+                </article>
+                <article className="decision-card dividend-card">
+                  <span>Dividend profile</span>
+                  <strong>{formatPrice(marketData.quote.averageDividendPayment, marketData.currency)}</strong>
+                  <small>{`Annual ${formatPrice(marketData.quote.dividendRate ?? marketData.quote.trailingAnnualDividendRate, marketData.currency)} | ex ${marketData.quote.exDividendDate ?? "n/a"}`}</small>
+                </article>
+              </div>
             </div>
           </section>
 
