@@ -496,10 +496,10 @@ h1 {
 .forecast-grid-line.vertical { stroke-dasharray: 4 6; }
 .forecast-axis-label { fill: var(--muted); font-size: 11px; font-weight: 750; }
 .forecast-area { fill: rgba(69, 108, 245, 0.08); }
-.forecast-line { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-.forecast-line.upper { stroke: rgba(18, 183, 106, 0.7); stroke-dasharray: 7 8; }
+.forecast-line { fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.forecast-line.upper { stroke: rgba(18, 183, 106, 0.85); }
 .forecast-line.base { stroke: var(--blue); }
-.forecast-line.lower { stroke: rgba(239, 68, 68, 0.75); stroke-dasharray: 7 8; }
+.forecast-line.lower { stroke: rgba(239, 68, 68, 0.85); }
 .forecast-point { cursor: pointer; outline: none; }
 .forecast-point:focus .base-dot,
 .forecast-point.selected .base-dot { stroke: #101828; stroke-width: 3; }

@@ -558,6 +558,47 @@ function buildSimulatedPaths(args: {
   });
 }
 
+function selectScenarioPaths(args: {
+  simulatedPaths: Array<{ label: string; points: Array<{ session: number; date: string; price: number | null }> }>;
+  bearishEnd: number | null;
+  normalEnd: number | null;
+  bullishEnd: number | null;
+}) {
+  if (args.bearishEnd === null || args.normalEnd === null || args.bullishEnd === null || args.simulatedPaths.length === 0) {
+    return [];
+  }
+
+  const bullishThreshold = (args.normalEnd + args.bullishEnd) / 2;
+  const bearishThreshold = (args.bearishEnd + args.normalEnd) / 2;
+  const classify = (finalPrice: number | null) => {
+    if (finalPrice === null) return null;
+    if (finalPrice >= bullishThreshold) return "bullish";
+    if (finalPrice <= bearishThreshold) return "bearish";
+    return "normal";
+  };
+  const pick = (scenario: "bullish" | "normal" | "bearish", target: number) => {
+    const candidates = args.simulatedPaths
+      .map((path) => ({ path, finalPrice: path.points.at(-1)?.price ?? null }))
+      .filter((candidate) => classify(candidate.finalPrice) === scenario && candidate.finalPrice !== null);
+    const pool = candidates.length > 0
+      ? candidates
+      : args.simulatedPaths.map((path) => ({ path, finalPrice: path.points.at(-1)?.price ?? null })).filter((candidate) => candidate.finalPrice !== null);
+    const chosen = pool.sort((a, b) => Math.abs(Number(a.finalPrice) - target) - Math.abs(Number(b.finalPrice) - target))[0];
+
+    return chosen ? {
+      scenario,
+      label: scenario === "bullish" ? "Bullish trend" : scenario === "normal" ? "Normal trend" : "Bearish trend",
+      points: chosen.path.points,
+    } : null;
+  };
+
+  return [
+    pick("bullish", args.bullishEnd),
+    pick("normal", args.normalEnd),
+    pick("bearish", args.bearishEnd),
+  ].filter((path): path is { scenario: "bullish" | "normal" | "bearish"; label: string; points: Array<{ session: number; date: string; price: number | null }> } => path !== null);
+}
+
 function estimateScenarioProbabilities(args: {
   lastClose: number;
   returns: number[];
@@ -644,6 +685,7 @@ function buildThreeMonthForecast(args: {
         method: "Insufficient return history for scenario probabilities",
       },
       points: [],
+      scenarioPaths: [],
       simulatedPaths: [],
     };
   }
@@ -658,7 +700,7 @@ function buildThreeMonthForecast(args: {
   const confidenceMultiplier = 0.67;
   const sessions = [0, 7, 14, 21, 31, 42, 52, 63];
   const startDate = new Date();
-  const simulatedPaths = buildSimulatedPaths({ lastClose, returns: args.returns, horizonSessions, pathCount: 7 });
+  const simulatedPaths = buildSimulatedPaths({ lastClose, returns: args.returns, horizonSessions, pathCount: 180 });
   const points = sessions.map((session) => {
     const base = lastClose * Math.exp(conservativeDailyDrift * session);
     const cone = confidenceMultiplier * dailyVolatility * Math.sqrt(session);
@@ -682,6 +724,12 @@ function buildThreeMonthForecast(args: {
     bullishEnd: finalPoint.upper,
     horizonSessions,
   });
+  const scenarioPaths = selectScenarioPaths({
+    simulatedPaths,
+    bearishEnd: finalPoint.lower,
+    normalEnd: finalPoint.base,
+    bullishEnd: finalPoint.upper,
+  });
 
   return {
     horizonSessions,
@@ -697,7 +745,8 @@ function buildThreeMonthForecast(args: {
     lowerReturnPercent: finalPoint.lower === null ? null : round(((Number(finalPoint.lower) / lastClose) - 1) * 100, 2),
     scenarioProbabilities,
     points,
-    simulatedPaths,
+    scenarioPaths,
+    simulatedPaths: [],
   };
 }
 
@@ -728,6 +777,11 @@ type ForecastCone = {
     method: string;
   };
   points: ForecastPoint[];
+  scenarioPaths: Array<{
+    scenario: string;
+    label: string;
+    points: Array<{ session: number; date: string; price: number | null }>;
+  }>;
   simulatedPaths: Array<{
     label: string;
     points: Array<{ session: number; date: string; price: number | null }>;
@@ -1137,6 +1191,11 @@ function buildPromptContext(args: {
       method: string;
     };
     points: Array<{ session: number; date: string; base: number | null; upper: number | null; lower: number | null }>;
+    scenarioPaths?: Array<{
+      scenario: string;
+      label: string;
+      points: Array<{ session: number; date: string; price: number | null }>;
+    }>;
     simulatedPaths?: Array<{
       label: string;
       points: Array<{ session: number; date: string; price: number | null }>;
@@ -1213,9 +1272,9 @@ Objective buy/sell/risk levels:
 - Forecast method: ${forecast.method}
 - Forecast confidence note: ${forecast.confidenceNote ?? "n/a"}
 - Forecast points: ${forecast.points.map((point) => `${point.date}: lower ${money(point.lower, currency)}, base ${money(point.base, currency)}, upper ${money(point.upper, currency)}`).join("; ")}
-- Simulated realistic paths: ${(forecast.simulatedPaths ?? []).map((path) => {
+- Realistic scenario trend paths: ${(forecast.scenarioPaths ?? []).map((path) => {
   const lastPoint = path.points.at(-1);
-  return `${path.label} final ${money(lastPoint?.price ?? null, currency)}`;
+  return `${path.label} final ${money(lastPoint?.price ?? null, currency)} with ${path.points.length} trading-session points`;
 }).join("; ") || "n/a"}
 
 Price and performance:

@@ -164,6 +164,11 @@ type MarketData = {
       upper: number | null;
       lower: number | null;
     }>;
+    scenarioPaths: Array<{
+      scenario: string;
+      label: string;
+      points: Array<{ session: number; date: string; price: number | null }>;
+    }>;
     simulatedPaths: Array<{
       label: string;
       points: Array<{ session: number; date: string; price: number | null }>;
@@ -552,13 +557,34 @@ function FundamentalCards({ marketData }: { marketData: MarketData }) {
 }
 
 function ForecastChart({ marketData }: { marketData: MarketData }) {
-  const points = marketData.forecast.points.filter(
-    (point) => point.base !== null && point.upper !== null && point.lower !== null,
+  const fallbackScenarioPaths = [
+    {
+      scenario: "bullish",
+      label: "Bullish trend",
+      points: marketData.forecast.points.map((point) => ({ session: point.session, date: point.date, price: point.upper })),
+    },
+    {
+      scenario: "normal",
+      label: "Normal trend",
+      points: marketData.forecast.points.map((point) => ({ session: point.session, date: point.date, price: point.base })),
+    },
+    {
+      scenario: "bearish",
+      label: "Bearish trend",
+      points: marketData.forecast.points.map((point) => ({ session: point.session, date: point.date, price: point.lower })),
+    },
+  ];
+  const scenarioPaths = marketData.forecast.scenarioPaths.length >= 3 ? marketData.forecast.scenarioPaths : fallbackScenarioPaths;
+  const bullishPath = scenarioPaths.find((path) => path.scenario === "bullish") ?? fallbackScenarioPaths[0];
+  const normalPath = scenarioPaths.find((path) => path.scenario === "normal") ?? fallbackScenarioPaths[1];
+  const bearishPath = scenarioPaths.find((path) => path.scenario === "bearish") ?? fallbackScenarioPaths[2];
+  const selectablePoints = normalPath.points.filter(
+    (point) => point.session === 0 || point.session === marketData.forecast.horizonSessions || point.session % 7 === 0,
   );
-  const [selectedIndex, setSelectedIndex] = useState(Math.max(0, points.length - 1));
-  const selectedPoint = points[selectedIndex] ?? points.at(-1);
+  const [selectedIndex, setSelectedIndex] = useState(Math.max(0, selectablePoints.length - 1));
+  const selectedPoint = selectablePoints[selectedIndex] ?? selectablePoints.at(-1);
 
-  if (points.length < 2) {
+  if (normalPath.points.length < 2) {
     return (
       <section className="forecast-panel" aria-label="3-month forecast chart">
         <div className="forecast-header">
@@ -577,38 +603,41 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
   const paddingRight = 24;
   const paddingTop = 26;
   const paddingBottom = 42;
-  const values = points.flatMap((point) => [Number(point.lower), Number(point.base), Number(point.upper)]);
+  const allScenarioPoints = [bullishPath, normalPath, bearishPath].flatMap((path) => path.points);
+  const values = allScenarioPoints.map((point) => Number(point.price)).filter(Number.isFinite);
   const minValue = Math.min(...values) * 0.992;
   const maxValue = Math.max(...values) * 1.008;
-  const maxSession = Math.max(...points.map((point) => point.session));
+  const maxSession = Math.max(...allScenarioPoints.map((point) => point.session));
   const x = (session: number) => paddingLeft + (session / maxSession) * (width - paddingLeft - paddingRight);
   const y = (value: number) => height - paddingBottom - ((value - minValue) / (maxValue - minValue)) * (height - paddingTop - paddingBottom);
-  const line = (key: "lower" | "base" | "upper") => points
-    .map((point) => `${x(point.session)},${y(Number(point[key]))}`)
+  const linePath = (path: typeof bullishPath) => path.points
+    .filter((point) => point.price !== null)
+    .map((point) => `${x(point.session)},${y(Number(point.price))}`)
     .join(" ");
-  const area = `${points.map((point) => `${x(point.session)},${y(Number(point.upper))}`).join(" ")} ${[...points]
+  const priceAt = (path: typeof bullishPath, session: number) => path.points.find((point) => point.session === session)?.price ?? null;
+  const area = `${bullishPath.points.map((point) => `${x(point.session)},${y(Number(point.price))}`).join(" ")} ${[...bearishPath.points]
     .reverse()
-    .map((point) => `${x(point.session)},${y(Number(point.lower))}`)
+    .map((point) => `${x(point.session)},${y(Number(point.price))}`)
     .join(" ")}`;
   const yTicks = Array.from({ length: 5 }, (_, index) => minValue + ((maxValue - minValue) / 4) * index);
-  const xTicks = points.filter((_, index) => index === 0 || index === points.length - 1 || index % 2 === 0);
+  const xTicks = selectablePoints.filter((_, index) => index === 0 || index === selectablePoints.length - 1 || index % 2 === 0);
 
   return (
     <section className="forecast-panel" aria-label="3-month forecast chart">
       <div className="forecast-header">
         <div>
           <span className="eyebrow">3-month AI forecast</span>
-          <h2>Three clear scenarios</h2>
+          <h2>Three realistic trend paths</h2>
         </div>
         <div className="forecast-summary">
-          <span>Bullish {formatPrice(marketData.forecast.upperEnd, marketData.currency)} | {formatPercent(marketData.forecast.scenarioProbabilities.bullish)}</span>
-          <span>Normal {formatPrice(marketData.forecast.baseEnd, marketData.currency)} | {formatPercent(marketData.forecast.scenarioProbabilities.normal)}</span>
-          <span>Bearish {formatPrice(marketData.forecast.lowerEnd, marketData.currency)} | {formatPercent(marketData.forecast.scenarioProbabilities.bearish)}</span>
+          <span>Bullish {formatPrice(priceAt(bullishPath, marketData.forecast.horizonSessions), marketData.currency)} | {formatPercent(marketData.forecast.scenarioProbabilities.bullish)}</span>
+          <span>Normal {formatPrice(priceAt(normalPath, marketData.forecast.horizonSessions), marketData.currency)} | {formatPercent(marketData.forecast.scenarioProbabilities.normal)}</span>
+          <span>Bearish {formatPrice(priceAt(bearishPath, marketData.forecast.horizonSessions), marketData.currency)} | {formatPercent(marketData.forecast.scenarioProbabilities.bearish)}</span>
         </div>
       </div>
       <div className="forecast-layout">
         <div className="forecast-chart-wrap">
-          <svg className="forecast-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Three-month forecast cone chart with axes">
+          <svg className="forecast-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Three-month realistic scenario paths with axes">
             {yTicks.map((tick) => (
               <g key={tick}>
                 <line x1={paddingLeft} x2={width - paddingRight} y1={y(tick)} y2={y(tick)} className="forecast-grid-line" />
@@ -626,10 +655,10 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
               </g>
             ))}
             <polygon points={area} className="forecast-area" />
-<polyline points={line("upper")} className="forecast-line upper" />
-            <polyline points={line("base")} className="forecast-line base" />
-            <polyline points={line("lower")} className="forecast-line lower" />
-            {points.map((point, index) => (
+            <polyline points={linePath(bullishPath)} className="forecast-line upper" />
+            <polyline points={linePath(normalPath)} className="forecast-line base" />
+            <polyline points={linePath(bearishPath)} className="forecast-line lower" />
+            {selectablePoints.map((point, index) => (
               <g
                 className={`forecast-point ${index === selectedIndex ? "selected" : ""}`}
                 key={point.session}
@@ -643,9 +672,9 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
                 }}
                 aria-label={`Select forecast point for ${point.date}`}
               >
-                <circle cx={x(point.session)} cy={y(Number(point.upper))} r="4" className="forecast-dot upper-dot" />
-                <circle cx={x(point.session)} cy={y(Number(point.base))} r="5" className="forecast-dot base-dot" />
-                <circle cx={x(point.session)} cy={y(Number(point.lower))} r="4" className="forecast-dot lower-dot" />
+                <circle cx={x(point.session)} cy={y(Number(priceAt(bullishPath, point.session)))} r="4" className="forecast-dot upper-dot" />
+                <circle cx={x(point.session)} cy={y(Number(priceAt(normalPath, point.session)))} r="5" className="forecast-dot base-dot" />
+                <circle cx={x(point.session)} cy={y(Number(priceAt(bearishPath, point.session)))} r="4" className="forecast-dot lower-dot" />
               </g>
             ))}
           </svg>
@@ -661,14 +690,14 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
             <strong>{selectedPoint.date}</strong>
             <dl>
               <div><dt>Session</dt><dd>{selectedPoint.session}</dd></div>
-              <div><dt>Bullish ({formatPercent(marketData.forecast.scenarioProbabilities.bullish)})</dt><dd>{formatPrice(selectedPoint.upper, marketData.currency)}</dd></div>
-              <div><dt>Normal ({formatPercent(marketData.forecast.scenarioProbabilities.normal)})</dt><dd>{formatPrice(selectedPoint.base, marketData.currency)}</dd></div>
-              <div><dt>Bearish ({formatPercent(marketData.forecast.scenarioProbabilities.bearish)})</dt><dd>{formatPrice(selectedPoint.lower, marketData.currency)}</dd></div>
+              <div><dt>Bullish ({formatPercent(marketData.forecast.scenarioProbabilities.bullish)})</dt><dd>{formatPrice(priceAt(bullishPath, selectedPoint.session), marketData.currency)}</dd></div>
+              <div><dt>Normal ({formatPercent(marketData.forecast.scenarioProbabilities.normal)})</dt><dd>{formatPrice(priceAt(normalPath, selectedPoint.session), marketData.currency)}</dd></div>
+              <div><dt>Bearish ({formatPercent(marketData.forecast.scenarioProbabilities.bearish)})</dt><dd>{formatPrice(priceAt(bearishPath, selectedPoint.session), marketData.currency)}</dd></div>
             </dl>
           </aside>
         )}
       </div>
-      <p className="forecast-method"><strong>{marketData.forecast.source}</strong>: {marketData.forecast.confidenceNote} {marketData.forecast.method} The chart shows three possible scenario paths. Percentages estimate how often historical-return simulations finish in each scenario zone.</p>
+      <p className="forecast-method"><strong>{marketData.forecast.source}</strong>: {marketData.forecast.confidenceNote} {marketData.forecast.method} The chart shows three realistic day-by-day trend paths selected from historical-return simulations. Percentages estimate how often simulations finish in each scenario zone.</p>
     </section>
   );
 }

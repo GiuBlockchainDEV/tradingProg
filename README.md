@@ -67,7 +67,7 @@ The UI includes a snowflake-style research radar inspired by visual equity resea
 
 ## Scenario probabilities
 
-Bullish, normal, and bearish probabilities are estimated with deterministic bootstrap simulations from recent historical returns. The app classifies simulated 3-month final prices into the three scenario zones and displays the resulting percentages in the chart legend and selected-point details.
+Bullish, normal, and bearish probabilities are estimated with deterministic bootstrap simulations from recent historical returns. The app classifies simulated 3-month final prices into the three scenario zones, selects one representative realistic path for each scenario, and displays the resulting percentages in the chart legend and selected-point details.
 
 ## USD normalization
 
