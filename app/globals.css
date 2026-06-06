@@ -714,6 +714,27 @@ h1 {
 .output-section { margin-top: 16px; padding: 22px; }
 .forecast-header,
 .report-header { justify-content: space-between; gap: 14px; margin-bottom: 16px; }
+
+.report-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.pdf-button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 9px 13px;
+  color: #fff;
+  background: var(--text);
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 850;
+}
+.pdf-button:hover {
+  filter: brightness(1.08);
+}
+
 .forecast-summary { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .forecast-summary span {
   border-radius: 999px;
@@ -1200,4 +1221,86 @@ tr:last-child td { border-bottom: 0; }
   th, td { padding: 10px 11px; }
 
   .disclaimer-modal { padding: 22px; border-radius: 22px; }
+}
+
+
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  body {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+  .app-shell {
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  .app-header,
+  .analysis-intro,
+  .command-card,
+  .disclaimer-backdrop,
+  .pdf-button {
+    display: none !important;
+  }
+  .analysis-results,
+  .output-section {
+    display: block !important;
+    margin: 0 0 14px !important;
+  }
+  .market-summary,
+  .result-section,
+  .output-section,
+  .snowflake-card,
+  .fundamental-grid article,
+  .advanced-card,
+  .forecast-panel,
+  .insight-card,
+  .decision-score-card,
+  .decision-card {
+    box-shadow: none !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .forecast-chart,
+  .snowflake-chart {
+    max-height: 280px;
+  }
+  .forecast-layout,
+  .snowflake-section,
+  .fundamental-grid,
+  .advanced-grid,
+  .decision-layout,
+  .decision-detail-grid,
+  .insight-grid {
+    display: block !important;
+  }
+  .forecast-detail-card,
+  .scenario-legend,
+  .research-score-grid,
+  .fundamental-grid article,
+  .advanced-card,
+  .decision-card {
+    margin-top: 8px !important;
+  }
+  .markdown-result,
+  .table-shell,
+  table {
+    overflow: visible !important;
+  }
+  table {
+    min-width: 0 !important;
+    width: 100% !important;
+    font-size: 9.5px !important;
+  }
+  th,
+  td {
+    padding: 6px 7px !important;
+  }
+  a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
 }

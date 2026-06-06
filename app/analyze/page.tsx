@@ -933,6 +933,14 @@ export default function Home() {
     }
   }
 
+  function downloadPdf() {
+    const previousTitle = document.title;
+    const asset = marketData?.symbol ?? "analysis";
+    document.title = `Equity Research Report - ${asset}`;
+    window.print();
+    document.title = previousTitle;
+  }
+
   return (
     <main className="app-shell">
       {!hasAcceptedDisclaimer && (
@@ -1123,7 +1131,10 @@ export default function Home() {
               <span className="eyebrow">AI output</span>
               <h2>Integrated investment report</h2>
             </div>
-            <span className="status-pill">Not financial advice</span>
+            <div className="report-actions">
+              <button className="pdf-button" onClick={downloadPdf} type="button">Download PDF</button>
+              <span className="status-pill">Not financial advice</span>
+            </div>
           </div>
 
           <MarkdownResult content={result} />
