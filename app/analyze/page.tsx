@@ -308,10 +308,9 @@ const workflows: Workflow[] = [
 ];
 
 const aiModelOptions = [
-  { value: "google:gemini-2.5-flash", label: "Flash 2.5", description: "Best default quality/speed balance" },
-  { value: "google:gemini-2.0-flash", label: "Flash 2.0", description: "Fallback when demand is high" },
-  { value: "google:gemini-1.5-flash", label: "Flash 1.5", description: "Fastest fallback option" },
-  { value: "deepseek:deepseek-v4", label: "DeepSeek V4", description: "DeepSeek provider, requires key" },
+  { value: "google:gemini-2.5-flash", label: "Gemini 2.5", description: "Balanced default" },
+  { value: "google:gemini-3.5-flash", label: "Gemini 3.5", description: "Higher reasoning option" },
+  { value: "deepseek:deepseek-v4", label: "DeepSeek V4", description: "DeepSeek provider" },
 ];
 
 function parseAiModelSelection(value: string) {

@@ -80,7 +80,7 @@ function normalizeModel(selection: AiSelection, provider: AiProvider) {
 }
 
 function googleModelCandidates(selectedModel: string) {
-  const fallback = (process.env.AI_FALLBACK_MODELS || "gemini-2.0-flash,gemini-1.5-flash")
+  const fallback = (process.env.AI_FALLBACK_MODELS || "gemini-3.5-flash")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);

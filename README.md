@@ -35,7 +35,7 @@ AI_MODEL=
 
 - `AI_API_KEY`: the AI provider API key, required by the server analysis route.
 - `AI_MODEL`: optional model override
-- `AI_FALLBACK_MODELS`: optional comma-separated model list used automatically when the primary model is overloaded or rate-limited
+- `AI_FALLBACK_MODELS`: optional comma-separated model list used automatically when the primary model is overloaded or rate-limited, defaulting to Gemini 3.5
 - `DEEPSEEK_API_KEY`: optional DeepSeek API key used when selecting DeepSeek V4
 - `DEEPSEEK_MODEL`: optional DeepSeek model override, default `deepseek-v4`
 - `DEEPSEEK_FALLBACK_MODELS`: optional comma-separated DeepSeek fallback models.
@@ -88,3 +88,5 @@ The API now returns an Alpha Score built from three pillars: technical model, fu
 The server retries temporary AI failures with exponential backoff and then tries fallback models before returning an error.
 
 The analysis page includes an AI model selector. DeepSeek V4 uses the DeepSeek chat-completions compatible API and requires `DEEPSEEK_API_KEY`.
+
+Current selectable models in the UI: Gemini 2.5, Gemini 3.5, and DeepSeek V4.
