@@ -308,15 +308,19 @@ const workflows: Workflow[] = [
 ];
 
 const aiModelOptions = [
-  { value: "google:gemini-2.5-flash", label: "Flash 2.5" },
-  { value: "google:gemini-2.0-flash", label: "Flash 2.0" },
-  { value: "google:gemini-1.5-flash", label: "Flash 1.5" },
-  { value: "deepseek:deepseek-v4", label: "DeepSeek V4" },
+  { value: "google:gemini-2.5-flash", label: "Flash 2.5", description: "Best default quality/speed balance" },
+  { value: "google:gemini-2.0-flash", label: "Flash 2.0", description: "Fallback when demand is high" },
+  { value: "google:gemini-1.5-flash", label: "Flash 1.5", description: "Fastest fallback option" },
+  { value: "deepseek:deepseek-v4", label: "DeepSeek V4", description: "DeepSeek provider, requires key" },
 ];
 
 function parseAiModelSelection(value: string) {
   const [aiProvider, aiModel] = value.split(":");
   return { aiProvider, aiModel };
+}
+
+function aiModelLabel(value: string) {
+  return aiModelOptions.find((option) => option.value === value)?.label ?? "AI model";
 }
 
 const starterState: FormState = {
@@ -1004,7 +1008,10 @@ export default function Home() {
               <span className="eyebrow">Start here</span>
               <h2>Analyze a stock</h2>
             </div>
-            <span className="status-pill">12/12 prompts included</span>
+            <div className="command-badges">
+              <span className="status-pill">12/12 prompts included</span>
+              <span className="model-active-pill">Model: {aiModelLabel(selectedAiModel)}</span>
+            </div>
           </div>
 
           <form onSubmit={submitAnalysis} className="stock-command-form">
@@ -1023,14 +1030,27 @@ export default function Home() {
                 </button>
               </div>
             </label>
-            <label>
-              AI model
-              <select className="model-select" value={selectedAiModel} onChange={(event) => setSelectedAiModel(event.target.value)}>
-                {aiModelOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </label>
+            <fieldset className="model-picker" aria-label="Choose AI model">
+              <legend>Choose AI model</legend>
+              <div className="model-card-grid">
+                {aiModelOptions.map((option) => {
+                  const isSelected = selectedAiModel === option.value;
+                  return (
+                    <button
+                      className={`model-card ${isSelected ? "selected" : ""}`}
+                      key={option.value}
+                      onClick={() => setSelectedAiModel(option.value)}
+                      type="button"
+                      aria-pressed={isSelected}
+                    >
+                      <span>{option.label}</span>
+                      <small>{option.description}</small>
+                      {isSelected && <em>Selected</em>}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
           </form>
 
           <p className="microcopy">
