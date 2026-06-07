@@ -351,6 +351,17 @@ h1 {
   letter-spacing: -0.04em;
 }
 .stock-command-form label { display: grid; gap: 10px; color: var(--muted); font-weight: 800; }
+.model-select {
+  min-height: 48px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 0 12px;
+  color: var(--text);
+  background: var(--surface-soft);
+  font-weight: 800;
+}
+
 .stock-input-shell {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

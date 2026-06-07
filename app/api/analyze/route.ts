@@ -53,31 +53,64 @@ const workflowCatalog = {
 } as const;
 
 
-function modelCandidates() {
-  const configured = [process.env.AI_MODEL, process.env.GEMINI_MODEL]
-    .flatMap((value) => value?.split(",") ?? [])
-    .map((value) => value.trim())
-    .filter(Boolean);
+type AiProvider = "google" | "deepseek";
+
+type AiSelection = {
+  aiProvider?: string;
+  aiModel?: string;
+};
+
+function normalizeProvider(selection: AiSelection): AiProvider {
+  if (selection.aiProvider === "deepseek" || selection.aiModel?.startsWith("deepseek:")) {
+    return "deepseek";
+  }
+
+  return "google";
+}
+
+function normalizeModel(selection: AiSelection, provider: AiProvider) {
+  const rawModel = selection.aiModel?.includes(":") ? selection.aiModel.split(":").at(-1) : selection.aiModel;
+  if (rawModel && rawModel.trim().length > 0) {
+    return rawModel.trim();
+  }
+
+  return provider === "deepseek"
+    ? process.env.DEEPSEEK_MODEL || "deepseek-v4"
+    : process.env.AI_MODEL || process.env.GEMINI_MODEL || "gemini-2.5-flash";
+}
+
+function googleModelCandidates(selectedModel: string) {
   const fallback = (process.env.AI_FALLBACK_MODELS || "gemini-2.0-flash,gemini-1.5-flash")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
 
-  return Array.from(new Set([...configured, "gemini-2.5-flash", ...fallback]));
+  return Array.from(new Set([selectedModel, "gemini-2.5-flash", ...fallback]));
+}
+
+function deepSeekModelCandidates(selectedModel: string) {
+  const fallback = (process.env.DEEPSEEK_FALLBACK_MODELS || "deepseek-chat,deepseek-reasoner")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return Array.from(new Set([selectedModel, ...fallback]));
 }
 
 function isRetriableAiError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  return /503|Service Unavailable|high demand|429|RESOURCE_EXHAUSTED|quota|timeout|fetch failed/i.test(message);
+  return /503|Service Unavailable|high demand|429|RESOURCE_EXHAUSTED|quota|rate|timeout|fetch failed/i.test(message);
 }
 
 function cleanAiError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
+  if (/DEEPSEEK_API_KEY/i.test(message)) return "DEEPSEEK_API_KEY is not configured.";
+  if (/AI_API_KEY/i.test(message)) return "AI_API_KEY is not configured.";
   if (/503|Service Unavailable|high demand/i.test(message)) {
-    return "The AI service is temporarily overloaded. Please try again shortly.";
+    return "The AI service is temporarily overloaded. Please try again shortly or choose another model.";
   }
-  if (/429|RESOURCE_EXHAUSTED|quota/i.test(message)) {
-    return "The AI service rate limit was reached. Please try again shortly.";
+  if (/429|RESOURCE_EXHAUSTED|quota|rate/i.test(message)) {
+    return "The AI service rate limit was reached. Please try again shortly or choose another model.";
   }
   return "The AI service could not complete the request.";
 }
@@ -86,16 +119,66 @@ async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function generateTextWithFallback(apiKey: string, prompt: string) {
+async function generateGoogleText(apiKey: string, modelName: string, prompt: string) {
   const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: modelName });
+  const result = await model.generateContent(prompt);
+  return result.response.text();
+}
+
+async function generateDeepSeekText(apiKey: string, modelName: string, prompt: string) {
+  const response = await fetch(process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: modelName,
+      messages: [
+        { role: "system", content: "You are an objective institutional equity research assistant. Return only the requested analysis." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.2,
+      stream: false,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`DeepSeek request failed with ${response.status}: ${await response.text()}`);
+  }
+
+  const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+  const text = data.choices?.[0]?.message?.content;
+
+  if (!text) {
+    throw new Error("DeepSeek response did not include content.");
+  }
+
+  return text;
+}
+
+async function generateTextWithFallback(selection: AiSelection, prompt: string) {
+  const provider = normalizeProvider(selection);
+  const selectedModel = normalizeModel(selection, provider);
+  const apiKey = provider === "deepseek"
+    ? process.env.DEEPSEEK_API_KEY
+    : process.env.AI_API_KEY || process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error(provider === "deepseek" ? "DEEPSEEK_API_KEY is not configured." : "AI_API_KEY is not configured.");
+  }
+
+  const candidates = provider === "deepseek" ? deepSeekModelCandidates(selectedModel) : googleModelCandidates(selectedModel);
   let lastError: unknown;
 
-  for (const modelName of modelCandidates()) {
+  for (const modelName of candidates) {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        const model = genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent(prompt);
-        return { text: result.response.text(), modelName };
+        const text = provider === "deepseek"
+          ? await generateDeepSeekText(apiKey, modelName, prompt)
+          : await generateGoogleText(apiKey, modelName, prompt);
+        return { text, modelName, provider };
       } catch (error) {
         lastError = error;
         if (!isRetriableAiError(error)) {
@@ -109,7 +192,7 @@ async function generateTextWithFallback(apiKey: string, prompt: string) {
   throw lastError;
 }
 
-type AiRequest = {
+type AiRequest = AiSelection & {
   workflow?: string;
   market?: string;
   timeframe?: string;
@@ -211,15 +294,6 @@ Formatting requirements:
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.AI_API_KEY || process.env.GEMINI_API_KEY;
-
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "AI_API_KEY is not configured. Add it in your environment variables, or copy .env.example to .env.local for local development." },
-      { status: 500 },
-    );
-  }
-
   let body: AiRequest;
 
   try {
@@ -229,7 +303,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const generated = await generateTextWithFallback(apiKey, buildPrompt(body));
+    const generated = await generateTextWithFallback(body, buildPrompt(body));
 
     return NextResponse.json({
       workflow: "Full 12-module integrated analysis",

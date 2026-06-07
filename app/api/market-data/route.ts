@@ -5,38 +5,119 @@ import { NextResponse } from "next/server";
 const yahooFinance = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
 
 
-function modelCandidates() {
-  const configured = [process.env.AI_MODEL, process.env.GEMINI_MODEL]
-    .flatMap((value) => value?.split(",") ?? [])
-    .map((value) => value.trim())
-    .filter(Boolean);
+type AiProvider = "google" | "deepseek";
+
+type AiSelection = {
+  aiProvider?: string;
+  aiModel?: string;
+};
+
+function normalizeProvider(selection: AiSelection): AiProvider {
+  if (selection.aiProvider === "deepseek" || selection.aiModel?.startsWith("deepseek:")) {
+    return "deepseek";
+  }
+
+  return "google";
+}
+
+function normalizeModel(selection: AiSelection, provider: AiProvider) {
+  const rawModel = selection.aiModel?.includes(":") ? selection.aiModel.split(":").at(-1) : selection.aiModel;
+  if (rawModel && rawModel.trim().length > 0) {
+    return rawModel.trim();
+  }
+
+  return provider === "deepseek"
+    ? process.env.DEEPSEEK_MODEL || "deepseek-v4"
+    : process.env.AI_MODEL || process.env.GEMINI_MODEL || "gemini-2.5-flash";
+}
+
+function googleModelCandidates(selectedModel: string) {
   const fallback = (process.env.AI_FALLBACK_MODELS || "gemini-2.0-flash,gemini-1.5-flash")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
 
-  return Array.from(new Set([...configured, "gemini-2.5-flash", ...fallback]));
+  return Array.from(new Set([selectedModel, "gemini-2.5-flash", ...fallback]));
+}
+
+function deepSeekModelCandidates(selectedModel: string) {
+  const fallback = (process.env.DEEPSEEK_FALLBACK_MODELS || "deepseek-chat,deepseek-reasoner")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return Array.from(new Set([selectedModel, ...fallback]));
 }
 
 function isRetriableAiError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  return /503|Service Unavailable|high demand|429|RESOURCE_EXHAUSTED|quota|timeout|fetch failed/i.test(message);
+  return /503|Service Unavailable|high demand|429|RESOURCE_EXHAUSTED|quota|rate|timeout|fetch failed/i.test(message);
 }
 
 async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function generateTextWithFallback(apiKey: string, prompt: string) {
+async function generateGoogleText(apiKey: string, modelName: string, prompt: string) {
   const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: modelName });
+  const result = await model.generateContent(prompt);
+  return result.response.text();
+}
+
+async function generateDeepSeekText(apiKey: string, modelName: string, prompt: string) {
+  const response = await fetch(process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: modelName,
+      messages: [
+        { role: "system", content: "Return strict JSON only. No markdown." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.15,
+      stream: false,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`DeepSeek request failed with ${response.status}: ${await response.text()}`);
+  }
+
+  const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+  const text = data.choices?.[0]?.message?.content;
+
+  if (!text) {
+    throw new Error("DeepSeek response did not include content.");
+  }
+
+  return text;
+}
+
+async function generateTextWithFallback(selection: AiSelection, prompt: string) {
+  const provider = normalizeProvider(selection);
+  const selectedModel = normalizeModel(selection, provider);
+  const apiKey = provider === "deepseek"
+    ? process.env.DEEPSEEK_API_KEY
+    : process.env.AI_API_KEY || process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error(provider === "deepseek" ? "DEEPSEEK_API_KEY is not configured." : "AI_API_KEY is not configured.");
+  }
+
+  const candidates = provider === "deepseek" ? deepSeekModelCandidates(selectedModel) : googleModelCandidates(selectedModel);
   let lastError: unknown;
 
-  for (const modelName of modelCandidates()) {
+  for (const modelName of candidates) {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        const model = genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent(prompt);
-        return { text: result.response.text(), modelName };
+        const text = provider === "deepseek"
+          ? await generateDeepSeekText(apiKey, modelName, prompt)
+          : await generateGoogleText(apiKey, modelName, prompt);
+        return { text, modelName, provider };
       } catch (error) {
         lastError = error;
         if (!isRetriableAiError(error)) {
@@ -50,7 +131,7 @@ async function generateTextWithFallback(apiKey: string, prompt: string) {
   throw lastError;
 }
 
-type MarketDataRequest = {
+type MarketDataRequest = AiSelection & {
   query?: string;
 };
 
@@ -863,7 +944,7 @@ function normalizeAiForecastPoint(point: unknown, fallback: ForecastPoint): Fore
   };
 }
 
-async function generateAiThreeMonthForecast(args: {
+async function generateAiThreeMonthForecast(args: AiSelection & {
   symbol: string;
   displayName: string;
   currency?: string;
@@ -875,15 +956,13 @@ async function generateAiThreeMonthForecast(args: {
   maxDrawdown: number | null;
   trend: string;
 }) {
-  const apiKey = process.env.AI_API_KEY || process.env.GEMINI_API_KEY;
-
-  if (!apiKey || args.lastClose === null || args.quantitativeForecast.points.length < 2) {
+  if (args.lastClose === null || args.quantitativeForecast.points.length < 2) {
     return args.quantitativeForecast;
   }
 
   try {
     const prompt = `Generate a conservative 3-month price forecast cone as strict JSON only.\n\nRules:\n- Use the historical prices, volatility and quantitative baseline below.\n- Do not be optimistic. Treat this as a scenario cone, not a promise.\n- Preserve the same sessions and date count as the baseline.\n- Output only valid JSON. No markdown.\n- JSON shape: {"source":"AI forecast + historical baseline","confidenceNote":"...","method":"...","points":[{"session":0,"date":"YYYY-MM-DD","lower":number,"base":number,"upper":number}]}\n- For each point enforce lower <= base <= upper.\n\nAsset: ${args.displayName} (${args.symbol})\nCurrency: ${args.currency ?? "n/a"}\nLast close: ${args.lastClose}\nTrend: ${args.trend}\n1Y return: ${args.oneYearReturn ?? "n/a"}%\nAnnualized volatility: ${args.annualizedVolatility ?? "n/a"}%\nMax drawdown: ${args.maxDrawdown ?? "n/a"}%\nRecent history sample: ${JSON.stringify(args.recentHistory.slice(-90))}\nQuantitative baseline: ${JSON.stringify(args.quantitativeForecast.points)}`;
-    const generated = await generateTextWithFallback(apiKey, prompt);
+    const generated = await generateTextWithFallback(args, prompt);
     const parsed = extractJsonObject(generated.text) as Record<string, unknown>;
     const aiPointsInput = Array.isArray(parsed.points) ? parsed.points : [];
     const points = args.quantitativeForecast.points.map((fallback, index) => normalizeAiForecastPoint(aiPointsInput[index], fallback));
@@ -1626,7 +1705,7 @@ Key fundamentals:
 
 Instructions: use these USD-normalized data points as the base for the report, do not invent missing metrics, keep the investment score, research scores, buy/sell/risk levels, scenario probabilities, target timeframes, dividend profile, and forecast visible. Treat macro/geopolitical comments as scenario sensitivity unless live data is explicitly provided. Recommend verification on TradingView/Yahoo and official company filings before execution.`;}
 
-async function getMarketData(query: string) {
+async function getMarketData(query: string, selection: AiSelection = {}) {
   const search = await yahooFinance.search(query, { quotesCount: 8, newsCount: 0 }) as unknown as { quotes?: Array<Record<string, string>> };
   const quotes = search.quotes ?? [];
   const match = quotes.find((quote) => PREFERRED_TYPES.has(String(quote.quoteType))) ?? quotes[0];
@@ -1923,6 +2002,8 @@ async function getMarketData(query: string) {
     annualizedVolatility: baseMetrics.annualizedVolatility,
     maxDrawdown: baseMetrics.maxDrawdown,
     trend: baseMetrics.trend,
+    aiProvider: selection.aiProvider,
+    aiModel: selection.aiModel,
   });
 
   return {
@@ -1994,7 +2075,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const data = await getMarketData(query);
+    const data = await getMarketData(query, body);
     return NextResponse.json(data);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error while retrieving market data.";

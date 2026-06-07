@@ -307,6 +307,18 @@ const workflows: Workflow[] = [
   },
 ];
 
+const aiModelOptions = [
+  { value: "google:gemini-2.5-flash", label: "Flash 2.5" },
+  { value: "google:gemini-2.0-flash", label: "Flash 2.0" },
+  { value: "google:gemini-1.5-flash", label: "Flash 1.5" },
+  { value: "deepseek:deepseek-v4", label: "DeepSeek V4" },
+];
+
+function parseAiModelSelection(value: string) {
+  const [aiProvider, aiModel] = value.split(":");
+  return { aiProvider, aiModel };
+}
+
 const starterState: FormState = {
   market: "",
   timeframe: "Automatically selected from market data and the full 12-module analysis",
@@ -838,6 +850,7 @@ function ForecastChart({ marketData }: { marketData: MarketData }) {
 
 export default function Home() {
   const [form, setForm] = useState<FormState>(starterState);
+  const [selectedAiModel, setSelectedAiModel] = useState(aiModelOptions[0].value);
   const [marketData, setMarketData] = useState<MarketData | null>(null);
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
@@ -879,7 +892,7 @@ export default function Home() {
     const response = await fetch("/api/market-data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query, ...parseAiModelSelection(selectedAiModel) }),
     });
     const data = await response.json();
 
@@ -913,7 +926,7 @@ export default function Home() {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(enrichedForm),
+        body: JSON.stringify({ ...enrichedForm, ...parseAiModelSelection(selectedAiModel) }),
       });
       const data = await response.json();
 
@@ -1009,6 +1022,14 @@ export default function Home() {
                   <span>{isLoading ? "Analyzing..." : "Generate report"}</span>
                 </button>
               </div>
+            </label>
+            <label>
+              AI model
+              <select className="model-select" value={selectedAiModel} onChange={(event) => setSelectedAiModel(event.target.value)}>
+                {aiModelOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
             </label>
           </form>
 
