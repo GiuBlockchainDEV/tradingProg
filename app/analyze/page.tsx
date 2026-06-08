@@ -310,7 +310,7 @@ const workflows: Workflow[] = [
 const aiModelOptions = [
   { value: "google:gemini-2.5-flash", label: "Gemini 2.5", description: "Balanced default" },
   { value: "google:gemini-3.5-flash", label: "Gemini 3.5", description: "Higher reasoning option" },
-  { value: "deepseek:deepseek-v4", label: "DeepSeek V4", description: "DeepSeek provider" },
+  { value: "deepseek:deepseek-chat", label: "DeepSeek V4", description: "DeepSeek chat endpoint" },
 ];
 
 function parseAiModelSelection(value: string) {

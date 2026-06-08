@@ -27,7 +27,7 @@ function normalizeModel(selection: AiSelection, provider: AiProvider) {
   }
 
   return provider === "deepseek"
-    ? process.env.DEEPSEEK_MODEL || "deepseek-v4"
+    ? process.env.DEEPSEEK_MODEL || "deepseek-chat"
     : process.env.AI_MODEL || process.env.GEMINI_MODEL || "gemini-2.5-flash";
 }
 
@@ -51,7 +51,7 @@ function deepSeekModelCandidates(selectedModel: string) {
 
 function isRetriableAiError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  return /503|Service Unavailable|high demand|429|RESOURCE_EXHAUSTED|quota|rate|timeout|fetch failed/i.test(message);
+  return /503|Service Unavailable|high demand|429|400|model|not found|invalid|RESOURCE_EXHAUSTED|quota|rate|timeout|fetch failed/i.test(message);
 }
 
 async function sleep(ms: number) {
