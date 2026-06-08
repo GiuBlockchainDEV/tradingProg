@@ -1,0 +1,47 @@
+{
+  "name": "equity-research-lab",
+  "version": "0.1.0",
+  "description": "Next.js AI equity research dashboard with automated market data.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GiuBlockchainDEV/tradingProg.git"
+  },
+  "keywords": [
+    "nextjs",
+    "trading",
+    "finance",
+    "ai"
+  ],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/GiuBlockchainDEV/tradingProg/issues"
+  },
+  "homepage": "https://github.com/GiuBlockchainDEV/tradingProg#readme",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "next": "^16.2.7",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "yahoo-finance2": "^3.15.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "@types/react": "^19.2.16",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.7",
+    "postcss": "^8.5.15",
+    "typescript": "^6.0.3"
+  },
+  "private": true,
+  "overrides": {
+    "postcss": "$postcss"
+  }
+}
