@@ -1025,7 +1025,7 @@ export default function Home() {
           </div>
 
           <form onSubmit={submitAnalysis} className="stock-command-form">
-            <label>
+            <label className="ticker-field">
               Stock name or ticker
               <div className="stock-input-shell">
                 <input
