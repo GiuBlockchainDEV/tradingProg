@@ -1018,10 +1018,7 @@ export default function Home() {
               <span className="eyebrow">Start here</span>
               <h2>Analyze a stock</h2>
             </div>
-            <div className="command-badges">
-              <span className="status-pill">12/12 prompts included</span>
-              <span className="model-active-pill">Model: {aiModelLabel(selectedAiModel)}</span>
-            </div>
+            <span className="model-active-pill">Model: {aiModelLabel(selectedAiModel)}</span>
           </div>
 
           <form onSubmit={submitAnalysis} className="stock-command-form">
@@ -1051,11 +1048,10 @@ export default function Home() {
                       key={option.value}
                       onClick={() => setSelectedAiModel(option.value)}
                       type="button"
+                      title={option.description}
                       aria-pressed={isSelected}
                     >
                       <span>{option.label}</span>
-                      <small>{option.description}</small>
-                      {isSelected && <em>Selected</em>}
                     </button>
                   );
                 })}
@@ -1142,26 +1138,19 @@ export default function Home() {
             </div>
           </section>
 
-          <section className="result-section">
-            <div className="section-title-row">
-              <div>
-                <span className="eyebrow">Research scores</span>
-                <h2>Visual company profile</h2>
-              </div>
+          <details className="research-details">
+            <summary>
+              <span>
+                <strong>Research details</strong>
+                <small>Snowflake, fundamentals, alpha score, patterns, strategy lab and seasonality</small>
+              </span>
+            </summary>
+            <div className="research-details-body">
+              <ResearchSnowflake marketData={marketData} />
+              <FundamentalCards marketData={marketData} />
+              <AdvancedIntelligenceCards marketData={marketData} />
             </div>
-            <ResearchSnowflake marketData={marketData} />
-            <FundamentalCards marketData={marketData} />
-          </section>
-
-          <section className="result-section">
-            <div className="section-title-row">
-              <div>
-                <span className="eyebrow">Advanced intelligence</span>
-                <h2>Alpha, patterns, strategy lab and seasonality</h2>
-              </div>
-            </div>
-            <AdvancedIntelligenceCards marketData={marketData} />
-          </section>
+          </details>
 
           <section className="result-section">
             <div className="section-title-row">
@@ -1179,8 +1168,8 @@ export default function Home() {
         <section className="output-section" id="report" aria-live="polite">
           <div className="report-header">
             <div>
-              <span className="eyebrow">AI output</span>
-              <h2>Integrated investment report</h2>
+              <span className="eyebrow">Report</span>
+              <h2>Investment report</h2>
             </div>
             <div className="report-actions">
               {aiRunInfo && (
