@@ -12,6 +12,13 @@ type Workflow = {
   placeholder: string;
 };
 
+type AiRunInfo = {
+  provider: string;
+  requestedModel: string;
+  modelUsed: string;
+  fallbackUsed: boolean;
+};
+
 type FormState = {
   market: string;
   timeframe: string;
@@ -311,6 +318,7 @@ const aiModelOptions = [
   { value: "google:gemini-2.5-flash", label: "Gemini 2.5", description: "Balanced default" },
   { value: "google:gemini-3.5-flash", label: "Gemini 3.5", description: "Higher reasoning option" },
   { value: "deepseek:deepseek-chat", label: "DeepSeek V4", description: "DeepSeek chat endpoint" },
+  { value: "deepseek:deepseek-v4-pro", label: "DeepSeek V4 Pro", description: "If your account supports it" },
 ];
 
 function parseAiModelSelection(value: string) {
@@ -856,6 +864,7 @@ export default function Home() {
   const [selectedAiModel, setSelectedAiModel] = useState(aiModelOptions[0].value);
   const [marketData, setMarketData] = useState<MarketData | null>(null);
   const [result, setResult] = useState("");
+  const [aiRunInfo, setAiRunInfo] = useState<AiRunInfo | null>(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [hasAcceptedDisclaimer, setHasAcceptedDisclaimer] = useState(
@@ -911,6 +920,7 @@ export default function Home() {
     setIsLoading(true);
     setError("");
     setResult("");
+    setAiRunInfo(null);
     setMarketData(null);
 
     try {
@@ -941,6 +951,7 @@ export default function Home() {
         setMarketData(dataForPrompt);
         setForm(enrichedForm);
       }
+      setAiRunInfo(data.ai ?? null);
       setResult(data.result);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unexpected error.");
@@ -1172,6 +1183,11 @@ export default function Home() {
               <h2>Integrated investment report</h2>
             </div>
             <div className="report-actions">
+              {aiRunInfo && (
+                <span className={`ai-runtime-pill ${aiRunInfo.fallbackUsed ? "fallback" : ""}`}>
+                  Model used: {aiRunInfo.modelUsed}{aiRunInfo.fallbackUsed ? ` (fallback from ${aiRunInfo.requestedModel})` : ""}
+                </span>
+              )}
               <button className="pdf-button" onClick={downloadPdf} type="button">Download PDF</button>
               <span className="status-pill">Not financial advice</span>
             </div>

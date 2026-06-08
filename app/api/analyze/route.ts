@@ -178,7 +178,13 @@ async function generateTextWithFallback(selection: AiSelection, prompt: string) 
         const text = provider === "deepseek"
           ? await generateDeepSeekText(apiKey, modelName, prompt)
           : await generateGoogleText(apiKey, modelName, prompt);
-        return { text, modelName, provider };
+        return {
+          text,
+          modelName,
+          requestedModel: selectedModel,
+          provider,
+          fallbackUsed: modelName !== selectedModel,
+        };
       } catch (error) {
         lastError = error;
         if (!isRetriableAiError(error)) {
@@ -308,6 +314,12 @@ export async function POST(request: Request) {
     return NextResponse.json({
       workflow: "Full 12-module integrated analysis",
       result: generated.text,
+      ai: {
+        provider: generated.provider,
+        requestedModel: generated.requestedModel,
+        modelUsed: generated.modelName,
+        fallbackUsed: generated.fallbackUsed,
+      },
     });
   } catch (error) {
     return NextResponse.json(
